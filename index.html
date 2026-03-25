@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Sophisticated Ray & Big Bang</title>
+    <title>Deep Space - Lens Flare & Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -20,35 +20,39 @@
             mix-blend-mode: screen; 
         }
 
-        /* 2. 세련된 광선(Ray) 회전 레이어 */
+        /* 2. image_2.png의 날카로운 방사형 렌즈 플레어 구현 */
         #waveEffect::before {
             content: '';
             position: absolute;
             top: -50%; left: -50%;
             width: 200%; height: 200%;
-            /* 여러 갈래로 뻗어나가는 빛의 줄기 생성 */
-            background: repeating-conic-gradient(
-                from 0deg, 
-                rgba(255,255,255,0) 0deg, 
-                rgba(200,230,255,0.7) 10deg, 
-                rgba(255,255,255,0) 20deg
-            );
+            /* 날카롭고 수많은 방사형 광선들 구현 */
+            background:
+                /* 주 광선 4개 (Teal) */
+                conic-gradient(from 15deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.8) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 75deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 165deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.7) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 255deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
+                /* 얇고 수많은 방사형 광선들 (Cyan/Teal) */
+                repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.1) 0.5deg, rgba(200,230,255,0) 1.5deg),
+                repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.15) 1deg, rgba(200,230,255,0) 3deg);
             border-radius: 50%;
-            /* 중심부는 비우고 바깥으로 자연스럽게 사라지는 마스크 적용 */
             mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
             -webkit-mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
-            animation: spin 6s linear infinite; /* 부드러운 무한 회전 */
+            /* 회전 애니메이션 유지 */
+            animation: spin 6s linear infinite;
         }
 
-        /* 3. 초고온으로 빛나는 중심부 코어 */
+        /* 3. 강력한 중심부 코어 강화 */
         #waveEffect::after {
             content: '';
             position: absolute;
             top: 35%; left: 35%;
             width: 30%; height: 30%;
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.8) 50%, transparent 80%);
+            /* 더 밝고 넓은 코어 */
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.9) 60%, transparent 90%);
             border-radius: 50%;
-            box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.6);
         }
 
         @keyframes spin {
@@ -85,7 +89,7 @@
             float localEffect = exp(-dist * 5.0); 
             vAlpha += localEffect * uEnergyLevel * 3.0; 
 
-            // 4. 빅뱅 웅장함 업그레이드: 밀어내는 힘(Force) 1500.0으로 대폭 상향
+            // 빅뱅 웅장함 업그레이드: 밀어내는 힘(Force) 1500.0으로 대폭 상향
             float pushForce = localEffect * uShockStrength * 1500.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
@@ -105,7 +109,7 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 5. 폭발 순간 파티클 색상 변화: 하얀색에서 청백색(Cyan/Blue) 거성 느낌으로 전환
+            // 폭발 순간 파티클 색상 변화: 하얀색에서 청백색(Cyan/Blue) 거성 느낌으로 전환
             vec3 baseColor = vec3(1.0, 1.0, 1.0);
             vec3 explosionColor = vec3(0.5, 0.8, 1.0); 
             vec3 finalColor = mix(baseColor, explosionColor, vShock * 2.0);
@@ -327,9 +331,9 @@
             if (isHolding || waveOpacity > 0.005) {
                 waveEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
                 waveEffect.style.opacity = waveOpacity;
-            } else if (waveScale > 0) {
-                waveScale = 0;
-                waveEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+            } else if (flashScale > 0) {
+                flashScale = 0;
+                flashEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
