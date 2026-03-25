@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Epic Ray Core & 10% Slow Burst</title>
+    <title>Deep Space - High Density Micro Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -97,16 +97,16 @@
         varying float vBurstAlpha;
 
         void main() {
-            // 폭발 속도를 원본(3000.0) 기준 10% 수준인 300.0으로 극한 감속
-            vec3 finalPos = position + aVelocity * uBurstTime * 300.0;
+            // 1. 폭발 속도: 기존(300.0)에서 약 30% 상향된 400.0으로 설정
+            vec3 finalPos = position + aVelocity * uBurstTime * 400.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
             mvPosition.xy += uBurstCenter * 2000.0; 
 
             gl_Position = projectionMatrix * mvPosition;
             
-            // 속도가 매우 느려진 만큼 중간에 사라지지 않도록 생존 시간을 15초로 연장
-            float progress = smoothstep(0.0, 15.0, uBurstTime); 
+            // 속도가 약간 빨라진 만큼 생존 시간을 12초로 맞춤 조정
+            float progress = smoothstep(0.0, 12.0, uBurstTime); 
             gl_PointSize = aSize * (1.0 - progress); 
             vBurstAlpha = 1.0 - progress; 
         }
@@ -147,7 +147,8 @@
         let isBursting = false;
 
         const BG_PARTICLE_COUNT = 80000;
-        const BURST_PARTICLE_COUNT = 60000; 
+        // 2. 파티클 개수: 기존 6만 개에서 2배 증가한 12만 개
+        const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
 
         init();
@@ -202,7 +203,9 @@
                 burstVel[i * 3] = Math.sin(phi) * Math.cos(theta) * speed;
                 burstVel[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * speed;
                 burstVel[i * 3 + 2] = Math.cos(phi) * speed;
-                burstSizes[i] = 1.0 + Math.random() * 4.0;
+                
+                // 3. 파티클 크기: 기존 대비 3배 작게 설정 (0.33 ~ 1.66 수준)
+                burstSizes[i] = (1.0 + Math.random() * 4.0) / 3.0; 
             }
             burstGeom.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
             burstGeom.setAttribute('aVelocity', new THREE.BufferAttribute(burstVel, 3));
@@ -332,8 +335,8 @@
             if (isBursting) {
                 burstTime += 0.016;
                 burstParticlesMaterial.uniforms.uBurstTime.value = burstTime;
-                // 폭발 속도를 10%로 줄인 만큼 파티클이 보여지는 시간을 15초로 대폭 연장
-                if (burstTime > 15.0) {
+                
+                if (burstTime > 12.0) {
                     isBursting = false;
                     burstParticlesMaterial.visible = false;
                 }
