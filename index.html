@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Massive High-Density Burst</title>
+    <title>Deep Space - Meteor Shower & Ultimate Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -24,7 +24,6 @@
                 radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%);
             border-radius: 50%;
             
-            /* 기본 블러 유지, 밝기는 JS에서 제어 */
             filter: blur(2px); 
             box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5);
             
@@ -99,15 +98,13 @@
             float phase = fract(uTime * 0.1 + aSize * 15.0); 
             float easePhase = phase * phase; 
             
-            // 2. 시간이 지날수록 급격하게 모이도록 지수 함수 가속도(3.0승) 적용
-            // 이를 통해 차징 후반부에 3배 이상 훨씬 많은 파티클이 응축됨
             float powerProgress = pow(uGatherProgress, 3.0);
 
             vec2 gatherMove = mvDirToCenter * easePhase * powerProgress;
             vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * powerProgress * 2.25;
 
             mvPosition.xy += gatherMove + mvSwirl;
-            mvPosition.z -= easePhase * 2400.0 * powerProgress; // 끌어당기는 Z축 깊이도 증가
+            mvPosition.z -= easePhase * 2400.0 * powerProgress; 
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
@@ -181,15 +178,15 @@
         let currentProgress = 0.0; 
         let rayScale = 0.0; 
         let rayOpacity = 0.0; 
-        let explosionBrightness = 2.0; // 폭발 밝기 변수
+        let explosionBrightness = 2.0; 
 
         let burstTime = 0.0;
         let isBursting = false;
 
-        // 1. 배경 파티클 개수: 기존 8만 개에서 2배 증가한 16만 개
         const BG_PARTICLE_COUNT = 160000; 
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
+        const meteors = []; // 유성 배열 유지
 
         init();
         animate();
@@ -267,6 +264,9 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
+            // 1. 유성우 개수를 300개로 대폭 증가
+            createMeteors(300);
+
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -279,6 +279,42 @@
             document.addEventListener('touchmove', onTouchMove, { passive: false });
             document.addEventListener('touchend', triggerHoldEnd, { passive: false }); 
             window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMeteors(count) {
+            const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
+            meteorGeometry.rotateX(Math.PI / 2); 
+            
+            const meteorMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.5, // 투명도를 살짝 높임
+                blending: THREE.AdditiveBlending,
+                depthTest: false
+            });
+
+            for(let i = 0; i < count; i++) {
+                const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
+                resetMeteor(meteor);
+                scene.add(meteor);
+                meteors.push(meteor);
+            }
+        }
+
+        function resetMeteor(meteor) {
+            // 2. 화면 중앙부(카메라 시야)에 집중적으로 생성되도록 범위 축소
+            meteor.position.set(
+                (Math.random() - 0.5) * 6000, 
+                (Math.random() - 0.5) * 4000, 
+                -2000 - Math.random() * 4000 
+            );
+            // 3. 유성이 화면을 가로지르는 속도 대폭 상향
+            meteor.userData.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 12, 
+                (Math.random() - 0.5) * 12 - 2, 
+                40 + Math.random() * 40 
+            );
+            meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
         function updateExplosionCenter(clientX, clientY) {
@@ -324,7 +360,6 @@
                     burstParticlesMaterial.visible = true;
                     burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
-                    // 3. 폭발 순간 밝기 2배 펌핑 (기존 120.0 대비 2배 이상인 Math.max(240.0, ...)으로 상향)
                     explosionBrightness = Math.max(240.0, explosionBrightness * 2.0); 
 
                     burstEffect.style.left = lastHeldX + 'px';
@@ -380,6 +415,15 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
+            // 유성우 애니메이션 업데이트 루프 추가
+            meteors.forEach(meteor => {
+                meteor.position.add(meteor.userData.velocity);
+                // 화면 밖으로 나갔거나 카메라를 완전히 통과했을 때 초기화
+                if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
+                    resetMeteor(meteor);
+                }
+            });
+
             let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
             
@@ -393,11 +437,8 @@
             bgParticlesMaterial.uniforms.uTime.value = time * 0.001; 
 
             if (isHolding) {
-                // 4. 차징 중에도 기하급수적으로 밝기가 올라가도록 수정 (pow(..., 5.0) 유지, 계수 증가)
-                // 최대 차징 시 기존 대비 2배 밝기 도달 (Max ~160)
                 explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 158.0; 
             } else {
-                // 폭발 밝기가 서서히 원상 복구됨
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
             }
 
@@ -417,7 +458,6 @@
             if (rayScale > 0.01) {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
                 rayEffect.style.opacity = rayOpacity;
-                // 계산된 폭발 밝기 적용 (기존 대비 2배 압도적인 눈부심)
                 rayEffect.style.filter = `blur(2px) brightness(${explosionBrightness})`; 
             } else {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
