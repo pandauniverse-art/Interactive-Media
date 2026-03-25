@@ -3,27 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cosmic Flash Media Art - Linear</title>
+    <title>Cosmic Flash Media Art - Localized Glow</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 1. 화이트 플래시 오버레이 스타일 추가 */
-        #whiteOverlay {
+        /* 1. 전체 덮기가 아닌 부분 방사형 빛 무리(Glow) 효과로 변경 */
+        #flashEffect {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #fff; /* 하얀색 */
-            opacity: 0; /* 처음에 투명 */
-            pointer-events: none; /* 클릭 방해 금지 */
-            z-index: 100; /* 맨 위에 표시 */
+            /* 빛 무리의 크기 설정 (화면 크기에 비례) */
+            width: 80vmin; 
+            height: 80vmin;
+            /* 중심은 완전한 흰색, 바깥으로 갈수록 투명해지는 그라데이션 */
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 20%, rgba(255,255,255,0) 70%);
+            border-radius: 50%;
+            /* x, y 좌표 지정 시 요소의 중앙이 마우스에 오도록 설정 */
+            transform: translate(-50%, -50%); 
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+            /* 배경 별들과 자연스럽게 빛이 합쳐지도록 블렌드 모드 추가 */
+            mix-blend-mode: screen; 
         }
     </style>
 </head>
 <body>
-    <div id="whiteOverlay"></div>
+    <div id="flashEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
@@ -67,13 +72,12 @@
 
     <script>
         let scene, camera, renderer, particlesMaterial;
-        let whiteOverlay; // 화이트 오버레이 div 참조
+        let flashEffect; 
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
         let explosionTime = 0.0;
-        let flashOpacity = 0.0; // 화이트 오버레이 투명도 상태
+        let flashOpacity = 0.0; 
 
-        // 밸런스 조정 변수
         const PARTICLE_COUNT = 250000;
         const SPACE_RANGE = 10000;
 
@@ -81,8 +85,7 @@
         animate();
 
         function init() {
-            // 화이트 오버레이 div 가져오기
-            whiteOverlay = document.getElementById('whiteOverlay');
+            flashEffect = document.getElementById('flashEffect');
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
@@ -123,15 +126,12 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // 4. 포스트 프로세싱 관련 초기화 코드 제거
-
-            // 이벤트 리스너
+            // 이벤트 리스너 등록
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mousedown', onClick);
             
-            document.addEventListener('touchstart', onTouchMove, { passive: false });
+            document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
-            document.addEventListener('touchend', onClick, { passive: false });
             
             window.addEventListener('resize', onWindowResize);
         }
@@ -146,20 +146,43 @@
             particlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
-        function onMouseMove(event) { updateExplosionCenter(event.clientX, event.clientY); }
-        function onTouchMove(event) { if (event.touches.length > 0) updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); }
+        function onMouseMove(event) { 
+            updateExplosionCenter(event.clientX, event.clientY); 
+        }
+        
+        function onTouchMove(event) { 
+            if (event.touches.length > 0) {
+                updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); 
+            }
+        }
 
-        function onClick(event) {
+        // 3. 발광 이펙트 트리거 함수 분리 (좌표값을 받아 해당 위치에서 빛나게 함)
+        function triggerFlash(clientX, clientY) {
             explosionTime = 1.0;
-            // 5. 클릭 시 화이트 플래시 오버레이 투명도 최대로 설정
             flashOpacity = 1.0;
+            
+            // 빛 무리의 중심을 클릭/터치한 픽셀 좌표로 이동
+            flashEffect.style.left = clientX + 'px';
+            flashEffect.style.top = clientY + 'px';
+        }
+
+        // 마우스 클릭 시
+        function onClick(event) {
+            triggerFlash(event.clientX, event.clientY);
+        }
+
+        // 모바일 화면 터치 시 (터치 즉시 반응하도록 touchstart 사용)
+        function onTouchStart(event) {
+            if (event.touches.length > 0) {
+                triggerFlash(event.touches[0].clientX, event.touches[0].clientY);
+                updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY);
+            }
         }
 
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // composer.setSize 제거
         }
 
         function animate(time) {
@@ -173,11 +196,10 @@
             particlesMaterial.uniforms.uExplosionTime.value = explosionTime;
             particlesMaterial.uniforms.uTime.value = time * 0.001;
             
-            // 6. 화이트 플래시 오버레이 페이드아웃 계산 및 적용 (완만하게 감소)
-            flashOpacity *= 0.92; // explosionTime보다 약간 빠르게 감소하도록 설정
-            whiteOverlay.style.opacity = flashOpacity;
+            // 4. 빛 무리 페이드아웃 적용
+            flashOpacity *= 0.90; // 자연스럽게 빛이 사라지도록 설정
+            flashEffect.style.opacity = flashOpacity;
 
-            // 7. renderer.render() 로 직접 렌더링
             renderer.render(scene, camera);
         }
     </script>
