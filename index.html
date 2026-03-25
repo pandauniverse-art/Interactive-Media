@@ -3,40 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Ray Core & Seamless Burst (Fixed)</title>
+    <title>Deep Space - Epic Ray Core & 10% Slow Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
         #rayEffect {
             position: fixed;
-            /* 클릭 시 Scale 0부터 시작하기 위해 초기 크기를 0vmin으로 설정 */
             width: 0vmin; 
             height: 0vmin;
-            /* 40% 수준으로 축소된 최대 크기 목표값 (JS에서 관리) */
-            --max-size: 8vmin;
+            --max-size: 12vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
             
-            /* 날카로운 레이(Ray) 형태 디자인 유지 */
             background: 
                 repeating-conic-gradient(from 0deg, transparent 0deg, rgba(200,230,255,0.9) 2deg, transparent 4deg, transparent 45deg),
                 radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%);
             border-radius: 50%;
             
-            /* 최대 차징 시 밝기 200% 증폭 (brightness(10.0)로 설정) */
-            filter: blur(2px) brightness(10.0); 
-            box-shadow: 0 0 50px 20px rgba(100, 200, 255, 0.8), 0 0 100px 40px rgba(255, 255, 255, 0.5);
+            filter: blur(2px) brightness(20.0); 
+            box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5);
             
-            /* 회전 애니메이션 translate 속성 깨지지 않게 수정 */
             animation: spin 10s linear infinite;
         }
 
         @keyframes spin { 
-            /* translate는 JS에서 제어하므로 rotate만 애니메이션 */
             100% { transform: translate(-50%, -50%) rotate(360deg); } 
         }
     </style>
@@ -60,8 +54,6 @@
             
             vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
             
-            // 위치 동기화 FIX: Perspective Projection 상의 파티클 depth를 고려하여 
-            // Normalized Device Coordinates(uExplosionCenter)를 World Space로 역계산
             vec2 targetMvXy = uExplosionCenter * abs(mvPosition.z) * 0.8; 
             vec2 mvDirToCenter = targetMvXy - mvPosition.xy;
             float mvDist = length(mvDirToCenter);
@@ -92,7 +84,6 @@
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
-            // 1. 아무것도 입력되지 않았을 때 기본 밝기 3배 증가 (vec3(3.0))
             gl_FragColor = vec4(vec3(3.0), vAlpha); 
         }
     </script>
@@ -106,15 +97,16 @@
         varying float vBurstAlpha;
 
         void main() {
-            vec3 finalPos = position + aVelocity * uBurstTime * 3000.0;
+            // 폭발 속도를 원본(3000.0) 기준 10% 수준인 300.0으로 극한 감속
+            vec3 finalPos = position + aVelocity * uBurstTime * 300.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
-            
             mvPosition.xy += uBurstCenter * 2000.0; 
 
             gl_Position = projectionMatrix * mvPosition;
             
-            float progress = smoothstep(0.0, 1.5, uBurstTime); 
+            // 속도가 매우 느려진 만큼 중간에 사라지지 않도록 생존 시간을 15초로 연장
+            float progress = smoothstep(0.0, 15.0, uBurstTime); 
             gl_PointSize = aSize * (1.0 - progress); 
             vBurstAlpha = 1.0 - progress; 
         }
@@ -148,14 +140,14 @@
         
         let targetProgress = 0.0;
         let currentProgress = 0.0; 
-        let rayScale = 0.0; // 스케일 0에서 시작
-        let rayOpacity = 0.0; // 밝기 0에서 시작
+        let rayScale = 0.0; 
+        let rayOpacity = 0.0; 
         
         let burstTime = 0.0;
         let isBursting = false;
 
         const BG_PARTICLE_COUNT = 80000;
-        const BURST_PARTICLE_COUNT = 30000; 
+        const BURST_PARTICLE_COUNT = 60000; 
         const SPACE_RANGE = 10000;
 
         init();
@@ -249,7 +241,6 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            // 카메라 드리프트는 기본 상태에서만 적용 (Hold 중에는 FIX를 위해 0으로)
             if(!isHolding) {
                 targetX = mouseX * 80; 
                 targetY = mouseY * 80;
@@ -257,13 +248,10 @@
                 targetX = 0;
                 targetY = 0;
             }
-            
-            // 위치 동기화 FIX:Normalized Device Coordinates 업데이트
             bgParticlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
         function onMouseMove(event) { 
-            // **위치 동기화 FIX**: Hold 중에도 실시간으로 픽셀 좌표 캡처 및 Shader 업데이트
             if(isHolding) { 
                 lastHeldX = event.clientX;
                 lastHeldY = event.clientY;
@@ -290,8 +278,6 @@
             targetProgress = 1.0;
             lastHeldX = clientX;
             lastHeldY = clientY;
-            
-            // 클릭 순간 카메라 움직임 차단 (위치 동기화 FIX)
             targetX = 0; targetY = 0;
             updateExplosionCenter(clientX, clientY);
         }
@@ -327,17 +313,13 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // 카메라 드리프트 보간
             camera.position.x += (targetX - camera.position.x) * 0.005;
             camera.position.y += (targetY - camera.position.y) * 0.005;
             camera.lookAt(scene.position);
 
-            // 보간 (Lerp) 유지
             let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
             
-            // **클릭 차징 애니메이션 (Scale 0부터 시작, 다 차면 목표 크기 100%)**
-            // CSS 변수 --max-size(8vmin)에 맞춰 JS 스케일링
             rayEffect.style.width = `calc(var(--max-size) * ${currentProgress})`;
             rayEffect.style.height = `calc(var(--max-size) * ${currentProgress})`;
             
@@ -350,17 +332,16 @@
             if (isBursting) {
                 burstTime += 0.016;
                 burstParticlesMaterial.uniforms.uBurstTime.value = burstTime;
-                if (burstTime > 1.5) {
+                // 폭발 속도를 10%로 줄인 만큼 파티클이 보여지는 시간을 15초로 대폭 연장
+                if (burstTime > 15.0) {
                     isBursting = false;
                     burstParticlesMaterial.visible = false;
                 }
             }
             
-            // CSS 레이 이펙트 포인트 동기화 (FIX)
             rayEffect.style.left = lastHeldX + 'px';
             rayEffect.style.top = lastHeldY + 'px';
             
-            // **클릭 차징 애니메이션 ( Scale 0에서 1로 부드럽게 팽창)**
             if (rayScale > 0.01) {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
                 rayEffect.style.opacity = rayOpacity;
