@@ -3,32 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cosmic Flash Media Art - Localized Glow</title>
+    <title>Deep Space Big Bang Media Art</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 1. 전체 덮기가 아닌 부분 방사형 빛 무리(Glow) 효과로 변경 */
-        #flashEffect {
+        /* 점진적으로 팽창하는 빅뱅 빛 효과 */
+        #bigBangEffect {
             position: fixed;
-            /* 빛 무리의 크기 설정 (화면 크기에 비례) */
-            width: 80vmin; 
-            height: 80vmin;
-            /* 중심은 완전한 흰색, 바깥으로 갈수록 투명해지는 그라데이션 */
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 20%, rgba(255,255,255,0) 70%);
+            width: 10vmin; 
+            height: 10vmin;
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(180,210,255,0.8) 20%, rgba(255,255,255,0) 70%);
             border-radius: 50%;
-            /* x, y 좌표 지정 시 요소의 중앙이 마우스에 오도록 설정 */
-            transform: translate(-50%, -50%); 
+            transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
-            /* 배경 별들과 자연스럽게 빛이 합쳐지도록 블렌드 모드 추가 */
             mix-blend-mode: screen; 
+            /* 부드러운 하이라이트를 위해 box-shadow 추가 */
+            box-shadow: 0 0 50px 20px rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
 <body>
-    <div id="flashEffect"></div>
+    <div id="bigBangEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
@@ -43,18 +41,24 @@
 
         void main() {
             vUv = uv;
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            
+            // 1. 천천히 빨려 들어가는 무한 줌인 효과 (Z축을 uTime에 따라 이동시키고 루프)
+            vec3 modPos = position;
+            modPos.z = mod(position.z + uTime * 200.0 + 5000.0, 10000.0) - 5000.0;
+            
+            vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
             
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float dist = distance(uExplosionCenter, screenPos);
             
+            // 2. 빅뱅 충격파: 폭발 중심에서 멀어질수록 힘이 급감하는 충격파 파동 계산
             vDistanceFactor = mix(1.0, 0.0, uExplosionTime);
-            float force = mix(1.0, 0.1, dist) * uExplosionTime * 100.0;
+            float shockwave = exp(-dist * 3.0) * uExplosionTime * 250.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
-            vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * force, force * 0.2, 0.0));
+            vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * shockwave, shockwave * 0.1, 0.0));
             gl_Position = finalPosition;
-            gl_PointSize = aSize * (1.0 + uExplosionTime * 3.0);
+            gl_PointSize = aSize * (1.0 + uExplosionTime * 5.0); // 폭발 시 입자 거대화
         }
     </script>
 
@@ -65,32 +69,41 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            vec3 color = mix(vec3(0.01, 0.1, 0.2), vec3(1.0, 1.0, 1.0), vDistanceFactor);
-            gl_FragColor = vec4(color, vDistanceFactor * 0.8);
+            // 폭발 시 푸른빛이 도는 백색으로 발광
+            vec3 color = mix(vec3(0.02, 0.08, 0.2), vec3(0.8, 0.9, 1.0), vDistanceFactor);
+            gl_FragColor = vec4(color, mix(0.6, 1.0, vDistanceFactor));
         }
     </script>
 
     <script>
         let scene, camera, renderer, particlesMaterial;
-        let flashEffect; 
+        let bigBangEffect; 
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
+        
+        // 폭발 변수
         let explosionTime = 0.0;
         let flashOpacity = 0.0; 
+        let flashScale = 0.0;
 
-        const PARTICLE_COUNT = 250000;
+        // 유성우 배열
+        const meteors = [];
+
+        // 설정값 (파티클 12.5만 개로 절반 축소)
+        const PARTICLE_COUNT = 125000;
         const SPACE_RANGE = 10000;
 
         init();
         animate();
 
         function init() {
-            flashEffect = document.getElementById('flashEffect');
+            bigBangEffect = document.getElementById('bigBangEffect');
 
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.z = 3000;
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
+            camera.position.z = 2500;
 
+            // 1. 백그라운드 별 파티클 생성
             const geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(PARTICLE_COUNT * 3);
             const sizes = new Float32Array(PARTICLE_COUNT);
@@ -98,8 +111,8 @@
             for (let i = 0; i < PARTICLE_COUNT; i++) {
                 positions[i * 3] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
                 positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
-                positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
-                sizes[i] = Math.random() * 2.5;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * SPACE_RANGE; // Z축도 분산
+                sizes[i] = Math.random() * 2.0;
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -121,60 +134,87 @@
             const particles = new THREE.Points(geometry, particlesMaterial);
             scene.add(particles);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            // 2. 유성우(Shooting Stars) 생성
+            createMeteors(10); // 유성 10개 배치
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // 이벤트 리스너 등록
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mousedown', onClick);
-            
             document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
-            
             window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMeteors(count) {
+            // 빛나는 선 형태의 지오메트리
+            const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
+            meteorGeometry.rotateX(Math.PI / 2); // Z축 방향으로 눕힘
+            
+            const meteorMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending,
+                depthTest: false
+            });
+
+            for(let i = 0; i < count; i++) {
+                const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
+                resetMeteor(meteor);
+                scene.add(meteor);
+                meteors.push(meteor);
+            }
+        }
+
+        function resetMeteor(meteor) {
+            // 카메라 아주 멀리 뒤쪽에서 무작위 위치로 스폰
+            meteor.position.set(
+                (Math.random() - 0.5) * 8000,
+                (Math.random() - 0.5) * 6000,
+                -4000 - Math.random() * 5000
+            );
+            
+            // 카메라 쪽으로 날아오면서 대각선으로 떨어지는 속도 벡터
+            meteor.userData.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 80, // X축 이동
+                (Math.random() - 0.5) * 80 - 20, // Y축 하강
+                150 + Math.random() * 200 // Z축 (카메라 향해 돌진)
+            );
+            
+            // 날아가는 방향으로 머리 회전
+            meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
         function updateExplosionCenter(clientX, clientY) {
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            targetX = mouseX * 500; 
-            targetY = mouseY * 500;
+            targetX = mouseX * 400; 
+            targetY = mouseY * 400;
             
             particlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
-        function onMouseMove(event) { 
-            updateExplosionCenter(event.clientX, event.clientY); 
-        }
-        
-        function onTouchMove(event) { 
-            if (event.touches.length > 0) {
-                updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); 
-            }
-        }
+        function onMouseMove(event) { updateExplosionCenter(event.clientX, event.clientY); }
+        function onTouchMove(event) { if (event.touches.length > 0) updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); }
 
-        // 3. 발광 이펙트 트리거 함수 분리 (좌표값을 받아 해당 위치에서 빛나게 함)
-        function triggerFlash(clientX, clientY) {
+        function triggerBigBang(clientX, clientY) {
             explosionTime = 1.0;
             flashOpacity = 1.0;
+            flashScale = 0.5; // 폭발 시작 크기
             
-            // 빛 무리의 중심을 클릭/터치한 픽셀 좌표로 이동
-            flashEffect.style.left = clientX + 'px';
-            flashEffect.style.top = clientY + 'px';
+            bigBangEffect.style.left = clientX + 'px';
+            bigBangEffect.style.top = clientY + 'px';
         }
 
-        // 마우스 클릭 시
-        function onClick(event) {
-            triggerFlash(event.clientX, event.clientY);
-        }
-
-        // 모바일 화면 터치 시 (터치 즉시 반응하도록 touchstart 사용)
+        function onClick(event) { triggerBigBang(event.clientX, event.clientY); }
         function onTouchStart(event) {
             if (event.touches.length > 0) {
-                triggerFlash(event.touches[0].clientX, event.touches[0].clientY);
+                triggerBigBang(event.touches[0].clientX, event.touches[0].clientY);
                 updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY);
             }
         }
@@ -188,17 +228,37 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
+            // 마우스에 반응하는 카메라의 부드러운 패닝
             camera.position.x += (targetX - camera.position.x) * 0.05;
             camera.position.y += (targetY - camera.position.y) * 0.05;
             camera.lookAt(scene.position);
 
-            explosionTime *= 0.96;
+            // 1. 유성우 애니메이션 업데이트
+            meteors.forEach(meteor => {
+                meteor.position.add(meteor.userData.velocity);
+                // 화면 밖을 완전히 벗어나면 다시 멀리서 리스폰
+                if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
+                    resetMeteor(meteor);
+                }
+            });
+
+            // 2. 파티클 폭발 및 줌인 셰이더 시간 업데이트
+            explosionTime *= 0.95; // 충격파 감쇄
             particlesMaterial.uniforms.uExplosionTime.value = explosionTime;
-            particlesMaterial.uniforms.uTime.value = time * 0.001;
+            particlesMaterial.uniforms.uTime.value = time * 0.001; // 무한 줌인 속도
             
-            // 4. 빛 무리 페이드아웃 적용
-            flashOpacity *= 0.90; // 자연스럽게 빛이 사라지도록 설정
-            flashEffect.style.opacity = flashOpacity;
+            // 3. 빅뱅 HTML 빛 효과 업데이트 (거대하게 팽창하며 서서히 사라짐)
+            if (flashOpacity > 0.01) {
+                flashScale += (80.0 - flashScale) * 0.04; // 80배까지 거대하게 팽창
+                flashOpacity *= 0.93; // 천천히 페이드아웃
+                
+                bigBangEffect.style.transform = `translate(-50%, -50%) scale(${flashScale})`;
+                bigBangEffect.style.opacity = flashOpacity;
+            } else if (flashScale > 0) {
+                // 완전히 안 보일 때 초기화
+                flashScale = 0;
+                bigBangEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+            }
 
             renderer.render(scene, camera);
         }
