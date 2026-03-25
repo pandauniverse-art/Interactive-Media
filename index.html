@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Stable Camera & Epic Big Bang</title>
+    <title>Deep Space - Seamless Overcharge & Optimization</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -64,14 +64,13 @@
             float distToCenterScreen = distance(uExplosionCenter, screenPos);
             float localEffect = exp(-distToCenterScreen * 5.0);
             
-            // 1. 파티클 빅뱅 폭발력 대폭 강화 (기존 1500.0 -> 8000.0으로 5배 이상 상향)
-            float pushForce = localEffect * uShockStrength * 8000.0; 
+            float pushForce = localEffect * uShockStrength * 1500.0; 
             vec2 pushMove = -mvDirNorm * pushForce; 
 
             mvPosition.xy += gatherMove + mvSwirl + pushMove;
             
-            // 폭발 시 Z축(앞으로 튀어나오는) 힘도 강화 (기존 0.1 -> 0.3)
-            mvPosition.z += pushForce * 0.3 - (easePhase * 800.0 * uGatherStrength); 
+            // 3. 폭발 시 Z축(앞으로 튀어나오는) 범위 30% 수준으로 대폭 축소 (기존 0.3 -> 0.09)
+            mvPosition.z += pushForce * 0.09 - (easePhase * 800.0 * uGatherStrength); 
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
@@ -115,8 +114,9 @@
         let waveScale = 0.0;
         let explosionBrightness = 2.0; 
 
+        // 1. 재클릭 시 부드러운 전환 FIX: 시간 기반이 아닌, 연속적인 진행률 변수 사용
+        let currentProgress = 0.0; // 0.0 ~ 1.0으로 부드럽게 증가 및 감소
         let isHolding = false;
-        let holdStartTime = -1; 
         let lastHeldX = 0, lastHeldY = 0; 
 
         const meteors = [];
@@ -221,9 +221,8 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            // 2. 카메라 왜곡을 기존(80) 기준 10% 수준인 '8'로 대폭 축소
-            targetX = mouseX * 8; 
-            targetY = mouseY * 8;
+            targetX = mouseX * 80; 
+            targetY = mouseY * 80;
             
             particlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
@@ -248,17 +247,15 @@
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
-            holdStartTime = -1; 
             lastHeldX = clientX;
             lastHeldY = clientY;
-            shockStrength = 0.0;   
+            // 재클릭 시 shockStrength를 강제로 0으로 만들지 않고, 서서히 감쇄하도록 유지
         }
 
         function triggerHoldEnd() {
             if (isHolding) { 
                 isHolding = false; 
-                holdStartTime = -1;
-                shockStrength = 1.0; 
+                shockStrength = 1.0; // 폭발 발생
                 explosionBrightness = Math.max(120.0, explosionBrightness * 1.5); 
             }
         }
@@ -293,20 +290,20 @@
             });
 
             if (isHolding) {
-                if (holdStartTime < 0) holdStartTime = time;
-                
-                let holdDuration = (time - holdStartTime) / 1000.0;
-                let progress = Math.min(holdDuration / 10.0, 1.0); 
+                // 2. 재클릭 시 부드러운 전환 FIX: 매 프레임 currentProgress를 서서히 증가시킴
+                // (기존 holdStartTime 대비 끊김 없음)
+                currentProgress = Math.min(currentProgress + 0.005, 1.0); // 10초 차징 속도와 매칭
 
-                energyLevel = progress; 
-                gatherStrength = progress; 
-                shockStrength = 0.0; 
+                energyLevel = currentProgress; 
+                gatherStrength = currentProgress; 
+                // shockStrength는 폭발 후 재클릭 시 서서히 0으로 감쇄하도록 별도 처리하지 않음
                 
-                waveScale = 0.1 + (progress * 1.5) + Math.sin(time * 0.002) * 0.05; 
-                waveOpacity = progress; 
+                waveScale = 0.1 + (currentProgress * 1.5) + Math.sin(time * 0.002) * 0.05; 
+                waveOpacity = currentProgress; 
                 
-                explosionBrightness = 2.0 + Math.pow(progress, 5.0) * 78.0; 
+                explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 78.0; 
             } else {
+                // 4. 폭발 및 페이드아웃 속도 극도로 감속 (아주 천천히 폭발하고 사라짐)
                 gatherStrength *= 0.98; 
                 shockStrength *= 0.998; 
                 energyLevel *= 0.995;    
@@ -314,6 +311,9 @@
                 waveScale += (60.0 - waveScale) * 0.002; 
                 waveOpacity *= 0.995; 
                 
+                // 재클릭을 위한 currentProgress 감쇄
+                currentProgress *= 0.98;
+
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
             }
 
