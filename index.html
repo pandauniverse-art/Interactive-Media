@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Seamless Overcharge & Optimization</title>
+    <title>Deep Space - Stable Camera & Epic Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -64,13 +64,11 @@
             float distToCenterScreen = distance(uExplosionCenter, screenPos);
             float localEffect = exp(-distToCenterScreen * 5.0);
             
-            float pushForce = localEffect * uShockStrength * 1500.0; 
+            float pushForce = localEffect * uShockStrength * 8000.0; 
             vec2 pushMove = -mvDirNorm * pushForce; 
 
             mvPosition.xy += gatherMove + mvSwirl + pushMove;
-            
-            // 3. 폭발 시 Z축(앞으로 튀어나오는) 범위 30% 수준으로 대폭 축소 (기존 0.3 -> 0.09)
-            mvPosition.z += pushForce * 0.09 - (easePhase * 800.0 * uGatherStrength); 
+            mvPosition.z += pushForce * 0.3 - (easePhase * 800.0 * uGatherStrength); 
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
@@ -101,6 +99,48 @@
         }
     </script>
 
+    <script id="burstVertexShader" type="x-shader/x-vertex">
+        uniform float uBurstTime;
+        uniform vec2 uExplosionCenter;
+        attribute float aSize;
+        attribute vec3 aVelocity;
+
+        varying float vBurstAlpha;
+
+        void main() {
+            // 폭발 중심으로부터 속도벡터 방향으로 시간 지남에 따라 이동
+            vec3 finalPos = aVelocity * uBurstTime;
+            
+            // Camera Space로 변환 및 투영
+            vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+            
+            // 셰이더 내부에서 explosion center를 projection 공간에 매핑 (단순화)
+            mvPosition.xy += uExplosionCenter * 2000.0; 
+
+            gl_Position = projectionMatrix * mvPosition;
+            gl_PointSize = aSize * (1.0 - uBurstTime / 2.0); // 시간이 지날수록 크기 축소
+
+            // 2초 동안 페이드 아웃
+            vBurstAlpha = 1.0 - smoothstep(0.0, 2.0, uBurstTime); 
+        }
+    </script>
+
+    <script id="burstFragmentShader" type="x-shader/x-fragment">
+        varying float vBurstAlpha;
+        
+        void main() {
+            float dist = distance(gl_PointCoord, vec2(0.5));
+            if (dist > 0.5 || vBurstAlpha < 0.001) discard;
+            
+            // 코어 컬러 설정 (화이트 -> 푸른색)
+            vec3 coreColor = vec3(1.0, 1.0, 1.0);
+            vec3 cyanColor = vec3(0.0, 1.0, 1.0);
+            vec3 finalBurstColor = mix(cyanColor, coreColor, vBurstAlpha);
+
+            gl_FragColor = vec4(finalBurstColor, vBurstAlpha);
+        }
+    </script>
+
     <script>
         let scene, camera, renderer, particlesMaterial;
         let waveEffect; 
@@ -114,14 +154,19 @@
         let waveScale = 0.0;
         let explosionBrightness = 2.0; 
 
-        // 1. 재클릭 시 부드러운 전환 FIX: 시간 기반이 아닌, 연속적인 진행률 변수 사용
-        let currentProgress = 0.0; // 0.0 ~ 1.0으로 부드럽게 증가 및 감소
+        let currentProgress = 0.0; 
         let isHolding = false;
         let lastHeldX = 0, lastHeldY = 0; 
 
         const meteors = [];
         const PARTICLE_COUNT = 125000;
         const SPACE_RANGE = 10000;
+
+        // **새로운 폭발 파티클 변수**
+        let burstParticles;
+        let burstMaterial;
+        let burstTime = 0.0;
+        const BURST_PARTICLE_COUNT = 50000; // 폭발 전용 파티클 수
 
         init();
         animate();
@@ -165,7 +210,11 @@
             const particles = new THREE.Points(geometry, particlesMaterial);
             scene.add(particles);
 
-            createMeteors(10); 
+            // **1. 유성우(별똥별) 수량 6배 많이 (10개 -> 60개)**
+            createMeteors(60); 
+
+            // **2. 새로운 폭발 전용 파티클 시스템 초기화**
+            createBurstParticles();
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -203,6 +252,46 @@
             }
         }
 
+        // **폭발 파티클 생성 함수**
+        function createBurstParticles() {
+            const burstGeometry = new THREE.BufferGeometry();
+            const velocities = new Float32Array(BURST_PARTICLE_COUNT * 3);
+            const sizes = new Float32Array(BURST_PARTICLE_COUNT);
+
+            for (let i = 0; i < BURST_PARTICLE_COUNT; i++) {
+                // 사방으로 뻗어나가는 무작위 속도 벡터 (방사형)
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                const speed = 2000.0 + Math.random() * 3000.0; // 매우 빠른 속도
+
+                velocities[i * 3] = Math.sin(theta) * Math.cos(phi) * speed;
+                velocities[i * 3 + 1] = Math.sin(theta) * Math.sin(phi) * speed;
+                velocities[i * 3 + 2] = Math.cos(theta) * speed;
+
+                sizes[i] = 1.0 + Math.random() * 3.0; // 크기
+            }
+
+            burstGeometry.setAttribute('aVelocity', new THREE.BufferAttribute(velocities, 3));
+            burstGeometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+            // 폭발 파티클 전용 셰이더 머티리얼
+            burstMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uBurstTime: { value: 0.0 }, // 폭발 발생 후 경과 시간
+                    uExplosionCenter: { value: new THREE.Vector2(0, 0) } // 폭발 중심
+                },
+                vertexShader: document.getElementById('burstVertexShader').textContent,
+                fragmentShader: document.getElementById('burstFragmentShader').textContent,
+                blending: THREE.AdditiveBlending, // 가산 혼합
+                depthTest: false,
+                transparent: true,
+                visible: false // 초기에는 숨김
+            });
+
+            burstParticles = new THREE.Points(burstGeometry, burstMaterial);
+            scene.add(burstParticles);
+        }
+
         function resetMeteor(meteor) {
             meteor.position.set(
                 (Math.random() - 0.5) * 8000,
@@ -221,6 +310,7 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
+            // 왜곡 최소화 유지
             targetX = mouseX * 80; 
             targetY = mouseY * 80;
             
@@ -249,14 +339,21 @@
             isHolding = true; 
             lastHeldX = clientX;
             lastHeldY = clientY;
-            // 재클릭 시 shockStrength를 강제로 0으로 만들지 않고, 서서히 감쇄하도록 유지
+            shockStrength = 0.0;   
         }
 
         function triggerHoldEnd() {
             if (isHolding) { 
                 isHolding = false; 
-                shockStrength = 1.0; // 폭발 발생
+                shockStrength = 1.0; // 폭발 발생 트리거
                 explosionBrightness = Math.max(120.0, explosionBrightness * 1.5); 
+
+                // **빅뱅 폭발 순간: 전용 폭발 파티클 활성화 및 초기화**
+                burstMaterial.visible = true;
+                burstMaterial.uniforms.uBurstTime.value = 0.0; // 시간 초기화
+                burstTime = 0.0; // 애니메이션 시간 초기화
+                // 폭발 중심점 전달 (기본 파티클 머티리얼에서 가져옴)
+                burstMaterial.uniforms.uExplosionCenter.value.copy(particlesMaterial.uniforms.uExplosionCenter.value);
             }
         }
 
@@ -289,21 +386,29 @@
                 }
             });
 
+            // **새로운 폭발 파티클 애니메이션 루프**
+            if (burstMaterial.visible) {
+                burstTime += 0.016; // 매 프레임 시간 증가 (약 60FPS 기준)
+                burstMaterial.uniforms.uBurstTime.value = burstTime;
+
+                // 2초 뒤에 폭발 파티클 숨김 및 초기화 (메모리 관리 및 루프 방지)
+                if (burstTime > 2.0) {
+                    burstMaterial.visible = false;
+                    burstMaterial.uniforms.uBurstTime.value = 0.0;
+                }
+            }
+
             if (isHolding) {
-                // 2. 재클릭 시 부드러운 전환 FIX: 매 프레임 currentProgress를 서서히 증가시킴
-                // (기존 holdStartTime 대비 끊김 없음)
-                currentProgress = Math.min(currentProgress + 0.005, 1.0); // 10초 차징 속도와 매칭
+                currentProgress = Math.min(currentProgress + 0.005, 1.0); 
 
                 energyLevel = currentProgress; 
                 gatherStrength = currentProgress; 
-                // shockStrength는 폭발 후 재클릭 시 서서히 0으로 감쇄하도록 별도 처리하지 않음
                 
                 waveScale = 0.1 + (currentProgress * 1.5) + Math.sin(time * 0.002) * 0.05; 
                 waveOpacity = currentProgress; 
                 
                 explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 78.0; 
             } else {
-                // 4. 폭발 및 페이드아웃 속도 극도로 감속 (아주 천천히 폭발하고 사라짐)
                 gatherStrength *= 0.98; 
                 shockStrength *= 0.998; 
                 energyLevel *= 0.995;    
@@ -311,7 +416,6 @@
                 waveScale += (60.0 - waveScale) * 0.002; 
                 waveOpacity *= 0.995; 
                 
-                // 재클릭을 위한 currentProgress 감쇄
                 currentProgress *= 0.98;
 
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
