@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Fixed Camera & Ultimate Burst</title>
+    <title>Deep Space - Synced Shockwave & Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -31,7 +31,6 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); } 
         }
 
-        /* 1. 화염 버스트 이펙트 (image_1.png) */
         #burstEffect {
             position: fixed;
             width: 0vmin; 
@@ -49,7 +48,6 @@
             filter: brightness(2.0); 
         }
 
-        /* 2. 공기 파장 이펙트 (Shockwave) */
         #shockwaveEffect {
             position: fixed;
             width: 0vmin;
@@ -167,7 +165,6 @@
         let burstParticlesMaterial, burstParticles;
         let rayEffect, burstEffect, shockwaveEffect; 
         
-        // 카메라 왜곡용 변수 완전 삭제됨
         let mouseX = 0, mouseY = 0;
         
         let isHolding = false;
@@ -197,7 +194,6 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
-            // 카메라 완전 고정
 
             const bgGeom = new THREE.BufferGeometry();
             const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
@@ -315,13 +311,12 @@
                 targetProgress = 0.0;
                 
                 if(currentProgress > 0.1) {
-                    // 1. 12만개 파티클 폭발 트리거
                     isBursting = true;
                     burstTime = 0.0;
                     burstParticlesMaterial.visible = true;
                     burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
-                    // 2. 화염 이미지 폭발 트리거
+                    // 화염 이미지 폭발 트리거 (파티클 속도에 맞춰 0.8초로 연장)
                     burstEffect.style.left = lastHeldX + 'px';
                     burstEffect.style.top = lastHeldY + 'px';
                     burstEffect.style.transition = 'none';
@@ -331,14 +326,14 @@
                     burstEffect.style.transform = 'translate(-50%, -50%) scale(0)';
                     
                     requestAnimationFrame(() => {
-                        burstEffect.style.transition = 'width 0.2s ease-out, height 0.2s ease-out, transform 0.2s ease-out, opacity 0.3s ease-in';
+                        burstEffect.style.transition = 'width 0.8s ease-out, height 0.8s ease-out, transform 0.8s ease-out, opacity 0.8s ease-in';
                         burstEffect.style.width = 'var(--max-size)';
                         burstEffect.style.height = 'var(--max-size)';
                         burstEffect.style.transform = 'translate(-50%, -50%) scale(1)';
                         burstEffect.style.opacity = '0'; 
                     });
 
-                    // 3. 공기 파장(Shockwave) 트리거
+                    // 공기 파장(Shockwave) 트리거 (파티클 확산 속도에 맞춰 1.5초로 대폭 연장)
                     shockwaveEffect.style.left = lastHeldX + 'px';
                     shockwaveEffect.style.top = lastHeldY + 'px';
                     shockwaveEffect.style.transition = 'none';
@@ -348,7 +343,7 @@
                     shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(0)';
                     
                     requestAnimationFrame(() => {
-                        shockwaveEffect.style.transition = 'width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out, opacity 0.2s ease-in';
+                        shockwaveEffect.style.transition = 'width 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), height 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), transform 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 1.5s ease-out';
                         shockwaveEffect.style.width = 'var(--max-size)';
                         shockwaveEffect.style.height = 'var(--max-size)';
                         shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(1)';
@@ -375,8 +370,6 @@
 
         function animate(time) {
             requestAnimationFrame(animate);
-
-            // 카메라 위치 완전히 고정 (이전의 + targetX 코드를 삭제함)
 
             let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
