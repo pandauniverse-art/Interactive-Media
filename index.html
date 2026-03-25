@@ -3,27 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Crisp Wavelength</title>
+    <title>Deep Space Big Bang - Crisp White Flash</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 뿌옇게 만드는 그라데이션/블러를 완전히 삭제하고 선명한 테두리(Border)만 남김 */
-        #waveEffect {
+        /* 이전 버전의 화려한 그라데이션 복구 & 블러(box-shadow) 제거 */
+        #flashEffect {
             position: fixed;
             width: 10vmin; 
             height: 10vmin;
-            border: 2px solid rgba(255, 255, 255, 1); /* 아주 선명하고 얇은 흰색 선 */
+            /* 1. 선명한 그라데이션 Stops: 0%~100% 완전한 흰색으로 채워 선명함 보장 */
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,225,255,1) 100%);
             border-radius: 50%;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
+            mix-blend-mode: screen; 
+            /* box-shadow 제거됨 */
         }
     </style>
 </head>
 <body>
-    <div id="waveEffect"></div>
+    <div id="flashEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
@@ -44,14 +47,10 @@
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float dist = distance(uExplosionCenter, screenPos);
             
-            // 1. 아무것도 안 할 때는 전체 별 투명도 20% (0.2) 고정
-            vAlpha = 0.2;
-
-            // 2. 전체 색상이 변하는 문제 해결: 마우스 중심부 근처만 밝아지도록 국소화
+            // 2. 파티클 크기 팽창 삭제 (블러/뭉개짐 원인 제거)
             float localEffect = exp(-dist * 5.0); 
-            vAlpha += localEffect * uEnergyLevel * 0.8; // 마우스 근처만 최대 1.0(100%)까지 선명해짐
+            vAlpha = localEffect * uEnergyLevel; // 마우스 중심부 근처만 밝아짐
 
-            // 3. 파티클 크기 팽창 삭제 (블러/뭉개짐 원인 제거)
             float pushForce = localEffect * uShockStrength * 400.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
@@ -68,26 +67,27 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 4. 불필요한 색상 믹스 삭제. 오직 깨끗한 흰색 픽셀로만 렌더링
+            // 3. 불필요한 색상 믹스 삭제. 오직 깨끗한 흰색 픽셀로만 렌더링
             gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
         }
     </script>
 
     <script>
         let scene, camera, renderer, particlesMaterial;
-        let waveEffect; 
+        let flashEffect; 
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
         
         let energyLevel = 0.0;    
         let shockStrength = 0.0;  
-        let waveOpacity = 0.0; 
-        let waveScale = 0.0;
+        let flashOpacity = 0.0; 
+        let flashScale = 0.0;
 
         let isHolding = false;
         let lastHeldX = 0, lastHeldY = 0;
 
         const meteors = [];
+
         const PARTICLE_COUNT = 125000;
         const SPACE_RANGE = 10000;
 
@@ -95,7 +95,7 @@
         animate();
 
         function init() {
-            waveEffect = document.getElementById('waveEffect');
+            flashEffect = document.getElementById('flashEffect');
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
@@ -157,7 +157,7 @@
             const meteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffffff, 
                 transparent: true, 
-                opacity: 0.4,
+                opacity: 0.6,
                 blending: THREE.AdditiveBlending,
                 depthTest: false
             });
@@ -221,6 +221,8 @@
             
             energyLevel = 1.0;     
             shockStrength = 0.0;   
+            flashOpacity = 1.0;
+            flashScale = 0.5; 
         }
 
         function triggerHoldEnd() {
@@ -257,21 +259,29 @@
                 }
             });
 
-            // 누르고 있을 때: 선명한 링(Ring) 파장 일렁임
+            // 시간 기반 애니메이션 팩터 계산
+            const pulseTime = time * 0.005; // 파장 속도 조절
+
+            // 지속/팽창 로직 업데이트: 일렁이는 파장 및 배경 유지 적용
             if (isHolding) {
+                // 누르고 있을 때: 끊임없이 일렁이는 파장 시각화
                 energyLevel = 1.0; 
                 shockStrength = 0.0; 
                 
-                // 크기와 투명도가 맥박처럼 뛰는 파장
-                waveScale = 3.0 + Math.sin(time * 0.01) * 0.5; 
-                waveOpacity = 0.5 + Math.sin(time * 0.015) * 0.5; 
+                // 투명도 진동 (0.8 ~ 1.0)
+                flashOpacity = 0.8 + Math.sin(pulseTime * 2.0) * 0.2; 
+                // 크기 미세 진동 및 절반 축소 (최대 14배 진동)
+                const baseHoldScale = 14.0;
+                flashScale = baseHoldScale + Math.sin(pulseTime) * 1.0; 
             } else {
-                // 손을 뗄 때: 선명한 링이 크게 팽창하며 사라짐
-                shockStrength *= 0.96;  
-                energyLevel *= 0.95;    
+                // 손을 떼면 기존의 팽창 및 페이드아웃
+                shockStrength *= 0.975;  
+                energyLevel *= 0.965;    
                 
-                waveScale += (40.0 - waveScale) * 0.04; 
-                waveOpacity *= 0.94; 
+                // 손을 떼는 순간 극적으로 팽창하되 최대 크기는 절반(40배)으로 제한
+                const maxExplosionScale = 40.0;
+                flashScale += (maxExplosionScale - flashScale) * 0.03; 
+                flashOpacity *= 0.965; // 페이드아웃
             }
 
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
@@ -279,16 +289,16 @@
             particlesMaterial.uniforms.uTime.value = time * 0.001; 
             
             if(isHolding) {
-                waveEffect.style.left = lastHeldX + 'px';
-                waveEffect.style.top = lastHeldY + 'px';
+                flashEffect.style.left = lastHeldX + 'px';
+                flashEffect.style.top = lastHeldY + 'px';
             }
 
-            if (isHolding || waveOpacity > 0.005) {
-                waveEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
-                waveEffect.style.opacity = waveOpacity;
-            } else if (waveScale > 0) {
-                waveScale = 0;
-                waveEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+            if (isHolding || flashOpacity > 0.005) {
+                flashEffect.style.transform = `translate(-50%, -50%) scale(${flashScale})`;
+                flashEffect.style.opacity = flashOpacity;
+            } else if (flashScale > 0) {
+                flashScale = 0;
+                flashEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
