@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Epic Charging & Big Bang</title>
+    <title>Deep Space - Black Hole Implosion & Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -17,14 +17,13 @@
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
-            /* 1. 전체 밝기 200% 증폭 및 코어 발광 추가 */
             filter: brightness(2.0);
             background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,220,255,0.8) 25%, transparent 60%);
             box-shadow: 0 0 60px 20px rgba(100, 200, 255, 0.6), 0 0 120px 40px rgba(255, 255, 255, 0.4);
             border-radius: 50%;
         }
 
-        /* 2. 메인 광선 레이어 (정방향 회전, 속도 50% 감소) */
+        /* 1. 중심부에서 뿜어져 나오는 메인 광선 (유지) */
         #waveEffect::before {
             content: '';
             position: absolute;
@@ -39,33 +38,45 @@
             border-radius: 50%;
             mask-image: radial-gradient(circle, transparent 5%, black 25%, transparent 65%);
             -webkit-mask-image: radial-gradient(circle, transparent 5%, black 25%, transparent 65%);
-            animation: spin 6s linear infinite; /* 3초에서 6초로 느려짐 */
+            animation: spin 6s linear infinite; 
         }
 
-        /* 3. 서브 광선 레이어 (역방향 회전 추가로 화려함 대폭 상향) */
-        #waveEffect::after {
-            content: '';
+        /* 2. 새롭게 추가된 빛 줄기 흡수(Sucking) 레이어들 */
+        .implosion-ray {
             position: absolute;
             top: -50%; left: -50%;
             width: 200%; height: 200%;
-            background:
-                conic-gradient(from 45deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.7) 1%, rgba(150,255,255,0) 2%),
-                conic-gradient(from 135deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.5) 1%, rgba(150,255,255,0) 2%),
-                conic-gradient(from 225deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.7) 1%, rgba(150,255,255,0) 2%),
-                conic-gradient(from 315deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.5) 1%, rgba(150,255,255,0) 2%),
-                repeating-conic-gradient(from 0deg, rgba(200,255,255,0) 0deg, rgba(200,255,255,0.1) 1deg, rgba(200,255,255,0) 2.5deg);
+            background: repeating-conic-gradient(from 0deg, rgba(150,255,255,0) 0deg, rgba(150,255,255,0.8) 1deg, rgba(150,255,255,0) 2deg);
             border-radius: 50%;
-            mask-image: radial-gradient(circle, transparent 15%, black 40%, transparent 60%);
-            -webkit-mask-image: radial-gradient(circle, transparent 15%, black 40%, transparent 60%);
-            animation: spin-reverse 8s linear infinite; /* 반대로 천천히 회전 */
+            mask-image: radial-gradient(circle, transparent 10%, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(circle, transparent 10%, black 40%, transparent 80%);
+            display: none; /* 기본적으로 숨김 */
         }
+        
+        /* 누르고 있을 때만 흡수 애니메이션 실행 */
+        #waveEffect.charging .implosion-ray {
+            display: block;
+            animation: implosion 1s cubic-bezier(0.5, 0, 1, 1) infinite;
+        }
+        /* 레이어 3개를 시차를 두고 재생하여 끊임없이 빨려들어가는 느낌 연출 */
+        #waveEffect .implosion-ray:nth-child(1) { animation-delay: 0.0s; }
+        #waveEffect .implosion-ray:nth-child(2) { animation-delay: 0.33s; }
+        #waveEffect .implosion-ray:nth-child(3) { animation-delay: 0.66s; }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
+        @keyframes implosion {
+            0% { transform: scale(2.0) rotate(0deg); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: scale(0.0) rotate(90deg); opacity: 0; }
+        }
     </style>
 </head>
 <body>
-    <div id="waveEffect"></div>
+    <div id="waveEffect">
+        <div class="implosion-ray"></div>
+        <div class="implosion-ray"></div>
+        <div class="implosion-ray"></div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
@@ -79,33 +90,50 @@
 
         varying float vAlpha;
         varying float vShock; 
+        varying float vGatherPhase; // 흡수되는 입자의 페이드아웃 조절용
 
         void main() {
             vec3 modPos = position;
+            // 배경 별의 기본 이동
             modPos.z = mod(position.z + uTime * 200.0 + 5000.0, 10000.0) - 5000.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
+            
+            // 3. 블랙홀 흡수 로직 (Camera Space 기반 계산)
+            vec2 targetMvXy = uExplosionCenter * abs(mvPosition.z) * 0.8; 
+            vec2 mvDirToCenter = targetMvXy - mvPosition.xy;
+            float mvDist = length(mvDirToCenter);
+            vec2 mvDirNorm = mvDist > 0.001 ? (mvDirToCenter / mvDist) : vec2(0.0);
+
+            // 각 입자마다 0.0 ~ 1.0을 반복하는 무한 루프 생성 (빨려들어가는 애니메이션)
+            float phase = fract(uTime * 1.5 + aSize * 15.0); 
+            vGatherPhase = phase * uGatherStrength; 
+
+            // 중심에 가까워질수록 속도가 빨라지도록 곡선(x^2) 적용
+            float easePhase = phase * phase; 
+            
+            // 중심을 향해 빨려 들어가는 움직임
+            vec2 gatherMove = mvDirToCenter * easePhase * uGatherStrength;
+
+            // 나선형으로 회전하며 빨려 들어가는 소용돌이(Swirl) 움직임 추가
+            vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * uGatherStrength * 1.5;
+
+            // 4. 폭발(Push) 로직
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
-            float dist = distance(uExplosionCenter, screenPos);
+            float distToCenterScreen = distance(uExplosionCenter, screenPos);
+            float localEffect = exp(-distToCenterScreen * 5.0);
             
-            vAlpha = 0.2; 
-
-            // 파티클 밝기 대폭 증폭 (3.0 -> 6.0)
-            float localEffect = exp(-dist * 5.0); 
-            vAlpha += localEffect * uEnergyLevel * 6.0; 
-
-            vec2 direction = normalize(screenPos - uExplosionCenter);
-            vec2 swirl = vec2(-direction.y, direction.x); 
-            
-            float pullForce = localEffect * uGatherStrength * 250.0; 
             float pushForce = localEffect * uShockStrength * 1500.0; 
+            vec2 pushMove = -mvDirNorm * pushForce; 
 
-            vec2 movement = direction * (pushForce - pullForce) + swirl * (pullForce * 0.8);
-            
-            vec4 finalPosition = projectionMatrix * (mvPosition + vec4(movement, (pushForce - pullForce) * 0.1, 0.0));
-            gl_Position = finalPosition;
+            // 움직임 종합 적용
+            mvPosition.xy += gatherMove + mvSwirl + pushMove;
+            mvPosition.z += pushForce * 0.1 - (easePhase * 800.0 * uGatherStrength); // 빨려 들어갈 땐 Z축으로도 깊어짐
+
+            gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
             
+            vAlpha = 0.2 + (localEffect * uEnergyLevel * 6.0); 
             vShock = uShockStrength * localEffect;
         }
     </script>
@@ -113,16 +141,23 @@
     <script id="fragmentShader" type="x-shader/x-fragment">
         varying float vAlpha;
         varying float vShock;
+        varying float vGatherPhase;
         
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
+            // 중심에 도달하면 자연스럽게 사라지도록 페이드아웃 적용
+            float gatherFade = 1.0 - smoothstep(0.8, 1.0, vGatherPhase);
+
             vec3 baseColor = vec3(1.0, 1.0, 1.0);
-            vec3 explosionColor = vec3(0.3, 0.9, 1.0); // 더 강렬한 Cyan/Blue 색상
+            vec3 explosionColor = vec3(0.3, 0.9, 1.0); 
             vec3 finalColor = mix(baseColor, explosionColor, vShock * 2.0);
             
-            gl_FragColor = vec4(finalColor, vAlpha + vShock); 
+            // 빨려 들어가는 입자는 푸른 빛을 띠게 함
+            vec3 gatherColor = mix(finalColor, vec3(0.5, 0.9, 1.0), vGatherPhase);
+            
+            gl_FragColor = vec4(gatherColor, (vAlpha + vShock) * gatherFade); 
         }
     </script>
 
@@ -270,6 +305,7 @@
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
+            waveEffect.classList.add('charging'); // 흡수 CSS 애니메이션 시작
             holdStartTime = -1; 
             lastHeldX = clientX;
             lastHeldY = clientY;
@@ -278,6 +314,7 @@
 
         function triggerHoldEnd() {
             isHolding = false; 
+            waveEffect.classList.remove('charging'); // 흡수 CSS 애니메이션 종료
             holdStartTime = -1;
             shockStrength = 1.0; 
         }
@@ -314,24 +351,25 @@
             if (isHolding) {
                 if (holdStartTime < 0) holdStartTime = time;
                 
+                // 5초 동안 증가하는 차징 프로세스
                 let holdDuration = (time - holdStartTime) / 1000.0;
                 let progress = Math.min(holdDuration / 5.0, 1.0); 
 
                 energyLevel = progress; 
-                gatherStrength = progress; 
+                gatherStrength = progress; // 시간이 지날수록 더 강하게 빨려 들어감
                 shockStrength = 0.0; 
                 
-                waveScale = 0.5 + (progress * 2.5) + Math.sin(time * 0.02) * 0.1; 
+                // 5초 동안 거대해지며, 도달 후에는 맥동(Pulse)만 유지
+                waveScale = 0.5 + (progress * 3.0) + Math.sin(time * 0.02) * 0.1; 
                 waveOpacity = 0.5 + (progress * 0.5); 
             } else {
-                // 4. 속도 50% 감소: 팽창 및 페이드아웃을 훨씬 천천히 진행 (웅장함 강조)
-                gatherStrength *= 0.9; 
-                shockStrength *= 0.975; // 기존 0.95에서 수치 조정으로 감쇄 속도 저하
-                energyLevel *= 0.95;    // 기존 0.90에서 수치 조정
+                // 손을 떼는 순간 빨아들이는 힘 차단 및 폭발
+                gatherStrength *= 0.8; 
+                shockStrength *= 0.975; 
+                energyLevel *= 0.95;    
                 
-                // 빛무리가 화면 전체를 천천히 삼키도록 목표 스케일 상향(100.0) 및 속도 저하(0.025)
                 waveScale += (100.0 - waveScale) * 0.025; 
-                waveOpacity *= 0.965; // 기존 0.93에서 페이드아웃 속도 저하
+                waveOpacity *= 0.965; 
             }
 
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
