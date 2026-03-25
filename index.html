@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 10% Speed Shockwave</title>
+    <title>Deep Space - Massive High-Density Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -18,12 +18,16 @@
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
+            
             background: 
                 repeating-conic-gradient(from 0deg, transparent 0deg, rgba(200,230,255,0.9) 2deg, transparent 4deg, transparent 45deg),
                 radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%);
             border-radius: 50%;
-            filter: blur(2px) brightness(20.0); 
+            
+            /* 기본 블러 유지, 밝기는 JS에서 제어 */
+            filter: blur(2px); 
             box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5);
+            
             animation: spin 10s linear infinite;
         }
 
@@ -95,13 +99,15 @@
             float phase = fract(uTime * 0.1 + aSize * 15.0); 
             float easePhase = phase * phase; 
             
-            float powerProgress = pow(uGatherProgress, 2.0);
+            // 2. 시간이 지날수록 급격하게 모이도록 지수 함수 가속도(3.0승) 적용
+            // 이를 통해 차징 후반부에 3배 이상 훨씬 많은 파티클이 응축됨
+            float powerProgress = pow(uGatherProgress, 3.0);
 
             vec2 gatherMove = mvDirToCenter * easePhase * powerProgress;
             vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * powerProgress * 2.25;
 
             mvPosition.xy += gatherMove + mvSwirl;
-            mvPosition.z -= easePhase * 1600.0 * powerProgress; 
+            mvPosition.z -= easePhase * 2400.0 * powerProgress; // 끌어당기는 Z축 깊이도 증가
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
@@ -175,11 +181,13 @@
         let currentProgress = 0.0; 
         let rayScale = 0.0; 
         let rayOpacity = 0.0; 
-        
+        let explosionBrightness = 2.0; // 폭발 밝기 변수
+
         let burstTime = 0.0;
         let isBursting = false;
 
-        const BG_PARTICLE_COUNT = 80000;
+        // 1. 배경 파티클 개수: 기존 8만 개에서 2배 증가한 16만 개
+        const BG_PARTICLE_COUNT = 160000; 
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
 
@@ -316,6 +324,9 @@
                     burstParticlesMaterial.visible = true;
                     burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
+                    // 3. 폭발 순간 밝기 2배 펌핑 (기존 120.0 대비 2배 이상인 Math.max(240.0, ...)으로 상향)
+                    explosionBrightness = Math.max(240.0, explosionBrightness * 2.0); 
+
                     burstEffect.style.left = lastHeldX + 'px';
                     burstEffect.style.top = lastHeldY + 'px';
                     burstEffect.style.transition = 'none';
@@ -332,7 +343,6 @@
                         burstEffect.style.opacity = '0'; 
                     });
 
-                    // 1. 공기 파장(Shockwave) 확산 속도를 기존 1.5초에서 15.0초로 10배 감속 (10% 속도)
                     shockwaveEffect.style.left = lastHeldX + 'px';
                     shockwaveEffect.style.top = lastHeldY + 'px';
                     shockwaveEffect.style.transition = 'none';
@@ -382,6 +392,15 @@
             bgParticlesMaterial.uniforms.uGatherProgress.value = currentProgress;
             bgParticlesMaterial.uniforms.uTime.value = time * 0.001; 
 
+            if (isHolding) {
+                // 4. 차징 중에도 기하급수적으로 밝기가 올라가도록 수정 (pow(..., 5.0) 유지, 계수 증가)
+                // 최대 차징 시 기존 대비 2배 밝기 도달 (Max ~160)
+                explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 158.0; 
+            } else {
+                // 폭발 밝기가 서서히 원상 복구됨
+                explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
+            }
+
             if (isBursting) {
                 burstTime += 0.016;
                 burstParticlesMaterial.uniforms.uBurstTime.value = burstTime;
@@ -398,6 +417,8 @@
             if (rayScale > 0.01) {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
                 rayEffect.style.opacity = rayOpacity;
+                // 계산된 폭발 밝기 적용 (기존 대비 2배 압도적인 눈부심)
+                rayEffect.style.filter = `blur(2px) brightness(${explosionBrightness})`; 
             } else {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
