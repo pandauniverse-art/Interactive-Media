@@ -3,26 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Crisp Wavelength with Ray Glow</title>
+    <title>Deep Space - Sophisticated Ray & Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 딱딱한 선(Border) 대신, 클릭 지점 주변만 빛이 퍼지는 레이(Ray) 블러 효과 적용 */
+        /* 1. 이펙트 컨테이너 */
         #waveEffect {
             position: fixed;
-            width: 12vmin; 
-            height: 12vmin;
-            /* 중심부는 완전한 흰색으로 선명하게, 바깥은 투명해지는 광원 효과 */
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,225,255,0.8) 30%, rgba(255,255,255,0) 70%);
-            /* 클릭 주위부만 살짝 블러 처리되어 빛이 뿜어져 나오는 느낌(Glow) 추가 */
-            box-shadow: 0 0 40px 15px rgba(255, 255, 255, 0.4);
-            border-radius: 50%;
+            width: 15vmin; 
+            height: 15vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
-            mix-blend-mode: screen; /* 배경 별들과 자연스럽게 빛이 섞이도록 설정 */
+            mix-blend-mode: screen; 
+        }
+
+        /* 2. 세련된 광선(Ray) 회전 레이어 */
+        #waveEffect::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            /* 여러 갈래로 뻗어나가는 빛의 줄기 생성 */
+            background: repeating-conic-gradient(
+                from 0deg, 
+                rgba(255,255,255,0) 0deg, 
+                rgba(200,230,255,0.7) 10deg, 
+                rgba(255,255,255,0) 20deg
+            );
+            border-radius: 50%;
+            /* 중심부는 비우고 바깥으로 자연스럽게 사라지는 마스크 적용 */
+            mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
+            -webkit-mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
+            animation: spin 6s linear infinite; /* 부드러운 무한 회전 */
+        }
+
+        /* 3. 초고온으로 빛나는 중심부 코어 */
+        #waveEffect::after {
+            content: '';
+            position: absolute;
+            top: 35%; left: 35%;
+            width: 30%; height: 30%;
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.8) 50%, transparent 80%);
+            border-radius: 50%;
+            box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.5);
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -39,6 +69,7 @@
         attribute float aSize;
 
         varying float vAlpha;
+        varying float vShock; // Fragment Shader로 폭발 강도 전달
 
         void main() {
             vec3 modPos = position;
@@ -48,31 +79,38 @@
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float dist = distance(uExplosionCenter, screenPos);
             
-            // 1. 아무것도 안 할 때는 전체 별 투명도 20% (0.2) 고정
-            vAlpha = 0.2;
+            vAlpha = 0.2; // 기본 투명도
 
-            // 2. 마우스 중심부 파티클 밝기 3배 증폭 (0.8 -> 2.4)
+            // 응축 시 밝기 증폭
             float localEffect = exp(-dist * 5.0); 
-            vAlpha += localEffect * uEnergyLevel * 2.4; 
+            vAlpha += localEffect * uEnergyLevel * 3.0; 
 
-            // 3. 파티클 크기 팽창 없이 위치만 밀어냄 (뭉개짐 방지)
-            float pushForce = localEffect * uShockStrength * 400.0; 
+            // 4. 빅뱅 웅장함 업그레이드: 밀어내는 힘(Force) 1500.0으로 대폭 상향
+            float pushForce = localEffect * uShockStrength * 1500.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
             vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * pushForce, pushForce * 0.1, 0.0));
             gl_Position = finalPosition;
             gl_PointSize = aSize; 
+            
+            vShock = uShockStrength * localEffect;
         }
     </script>
 
     <script id="fragmentShader" type="x-shader/x-fragment">
         varying float vAlpha;
+        varying float vShock;
         
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
+            // 5. 폭발 순간 파티클 색상 변화: 하얀색에서 청백색(Cyan/Blue) 거성 느낌으로 전환
+            vec3 baseColor = vec3(1.0, 1.0, 1.0);
+            vec3 explosionColor = vec3(0.5, 0.8, 1.0); 
+            vec3 finalColor = mix(baseColor, explosionColor, vShock * 2.0);
+            
+            gl_FragColor = vec4(finalColor, vAlpha + vShock); // 폭발 시 일시적으로 투명도 상승
         }
     </script>
 
@@ -222,13 +260,12 @@
             lastHeldX = clientX;
             lastHeldY = clientY;
             
-            energyLevel = 1.0;     
             shockStrength = 0.0;   
         }
 
         function triggerHoldEnd() {
             isHolding = false; 
-            shockStrength = 1.0; 
+            shockStrength = 1.0; // 손을 뗄 때 빅뱅 트리거
         }
 
         function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
@@ -261,18 +298,21 @@
             });
 
             if (isHolding) {
-                energyLevel = 1.0; 
+                // 부드럽게 에너지가 차오르는 연출
+                energyLevel += (1.0 - energyLevel) * 0.1; 
                 shockStrength = 0.0; 
                 
-                // 빛이 모이는 듯한 역동적인 크기/투명도 진동
-                waveScale = 2.0 + Math.sin(time * 0.01) * 0.3; 
-                waveOpacity = 0.8 + Math.sin(time * 0.015) * 0.2; 
+                // 크기가 미세하게 맥박침
+                waveScale = 1.0 + Math.sin(time * 0.01) * 0.1; 
+                waveOpacity = 1.0; 
             } else {
-                shockStrength *= 0.96;  
-                energyLevel *= 0.95;    
+                // 손을 떼는 순간 웅장한 감쇄 효과 (감쇄 속도를 늦춰 거대한 느낌 강조)
+                shockStrength *= 0.95;  
+                energyLevel *= 0.90;    
                 
-                waveScale += (40.0 - waveScale) * 0.04; 
-                waveOpacity *= 0.94; 
+                // 광선 레이어가 화면 전체를 덮을 정도로 거대하게 팽창
+                waveScale += (60.0 - waveScale) * 0.05; 
+                waveOpacity *= 0.93; 
             }
 
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
