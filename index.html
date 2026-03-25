@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Organic Core & 300% Big Bang</title>
+    <title>Deep Space - Overcharge & Kamehameha</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 선(Line)을 모두 제거하고, 중심부가 가장 밝고 바깥으로 부드럽게 퍼지는 자연스러운 빛 구현 */
         #waveEffect {
             position: fixed;
             width: 20vmin; 
@@ -18,13 +17,11 @@
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
-            /* 부드러운 블러 처리와 겹겹이 쌓인 광원 효과 */
             background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.8) 15%, rgba(100,180,255,0.4) 40%, transparent 70%);
             box-shadow: 0 0 100px 40px rgba(100, 200, 255, 0.4), 0 0 200px 80px rgba(255, 255, 255, 0.2);
             border-radius: 50%;
-            /* 블러 필터를 통해 인위적인 경계를 완전히 무너뜨림 */
             filter: blur(12px) brightness(2.0); 
-            transition: filter 0.1s ease-out; /* 밝기 변화를 부드럽게 */
+            /* 밝기 폭증을 더 드라마틱하게 보여주기 위해 transition 제거 (자바스크립트가 직접 프레임 제어) */
         }
     </style>
 </head>
@@ -77,10 +74,10 @@
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
             
-            // 1. 아무것도 하지 않을 때 별들의 밝기 기존(0.2) 대비 80% 증가 (0.36)
-            vAlpha = 0.36 + (localEffect * uEnergyLevel * 12.0); 
+            // 1. 임계점 도달 시 파티클의 밝기를 25.0까지 폭발적으로 증가시켜 중심부를 하얗게 날려버림
+            vAlpha = 0.36 + (localEffect * uEnergyLevel * 25.0); 
             
-            // 폭발 시 셰이더 내부 밝기도 3배 증폭을 위해 값을 키움
+            // 폭발 시 셰이더 내부 밝기 3배 유지
             vShock = uShockStrength * localEffect * 3.0;
         }
     </script>
@@ -99,9 +96,7 @@
             vec3 baseColor = vec3(1.0, 1.0, 1.0);
             vec3 explosionColor = vec3(0.3, 0.9, 1.0); 
             
-            // 폭발 강도(vShock)가 기존 대비 3배로 전달되므로 훨씬 하얗고 강렬하게 빛남
             vec3 finalColor = mix(baseColor, explosionColor, min(vShock, 1.0));
-            
             vec3 gatherColor = mix(finalColor, vec3(0.5, 0.9, 1.0), vGatherPhase);
             
             gl_FragColor = vec4(gatherColor, (vAlpha + vShock) * gatherFade); 
@@ -119,7 +114,7 @@
         let gatherStrength = 0.0; 
         let waveOpacity = 0.0; 
         let waveScale = 0.0;
-        let explosionBrightness = 2.0; // 폭발 시 밝기 증폭을 위한 변수
+        let explosionBrightness = 2.0; 
 
         let isHolding = false;
         let holdStartTime = -1; 
@@ -227,7 +222,6 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            // 2. 마우스 포인터 왜곡(이동량) 기존(400) 대비 20%인 80으로 대폭 축소
             targetX = mouseX * 80; 
             targetY = mouseY * 80;
             
@@ -261,12 +255,13 @@
         }
 
         function triggerHoldEnd() {
-            if (isHolding) { // 누르고 있다가 뗄 때만 발동
+            if (isHolding) { 
                 isHolding = false; 
                 holdStartTime = -1;
                 shockStrength = 1.0; 
-                // 3. 폭발 순간 밝기를 기본 충전 밝기(최대 4.0) 대비 300% 증폭 (12.0)
-                explosionBrightness = 12.0; 
+                
+                // 3. 폭발 순간 밝기를 최소 40.0으로 펌핑하여 압도적인 화이트 플래시 구현
+                explosionBrightness = Math.max(40.0, explosionBrightness * 1.5); 
             }
         }
 
@@ -312,8 +307,9 @@
                 waveScale = 0.1 + (progress * 1.5) + Math.sin(time * 0.002) * 0.05; 
                 waveOpacity = progress; 
                 
-                // 차징 중에는 부드러운 밝기 (기본 2.0에서 최대 4.0까지 증가)
-                explosionBrightness = 2.0 + (progress * 2.0);
+                // 2. 밝기 폭증 로직: Math.pow()를 사용하여 8초~10초 구간에서 밝기가 수직 상승(Max 30.0)
+                // 이를 통해 에너지가 모이다가 끝내 중심부 디테일이 완전히 타버리는(White-out) 연출 완성
+                explosionBrightness = 2.0 + Math.pow(progress, 4.0) * 28.0; 
             } else {
                 gatherStrength *= 0.98; 
                 shockStrength *= 0.998; 
@@ -322,7 +318,7 @@
                 waveScale += (60.0 - waveScale) * 0.002; 
                 waveOpacity *= 0.995; 
                 
-                // 폭발 밝기(12.0)가 서서히 원래 상태로 감소
+                // 폭발 밝기가 서서히 원상 복구됨
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
             }
 
@@ -339,7 +335,6 @@
             if (isHolding || waveOpacity > 0.005) {
                 waveEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
                 waveEffect.style.opacity = waveOpacity;
-                // 계산된 폭발 밝기와 부드러운 블러 적용
                 waveEffect.style.filter = `blur(12px) brightness(${explosionBrightness})`; 
             } else if (waveScale > 0) {
                 waveScale = 0;
