@@ -3,99 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space Big Bang - Fixed Hold & Sustained Universe</title>
+    <title>Deep Space - Crisp Wavelength</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        #bigBangEffect {
+        /* 뿌옇게 만드는 그라데이션/블러를 완전히 삭제하고 선명한 테두리(Border)만 남김 */
+        #waveEffect {
             position: fixed;
             width: 10vmin; 
             height: 10vmin;
-            /* 좁고 선명한 빛 범위 유지 */
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,225,255,0.9) 15%, rgba(255,255,255,0) 40%);
+            border: 2px solid rgba(255, 255, 255, 1); /* 아주 선명하고 얇은 흰색 선 */
             border-radius: 50%;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
-            mix-blend-mode: screen; 
-            /* 블러(box-shadow) 제거됨 */
         }
     </style>
 </head>
 <body>
-    <div id="bigBangEffect"></div>
+    <div id="waveEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script id="vertexShader" type="x-shader/x-vertex">
         uniform float uTime;
-        uniform float uEnergyLevel;    // 에너지 축적 상태 (밝기) - 0.0 ~ 1.0
-        uniform float uShockStrength;   // 폭발 충격파 강도 (입자 push) - 0.0 ~ 1.0
+        uniform float uEnergyLevel;
+        uniform float uShockStrength;
         uniform vec2 uExplosionCenter;
         attribute float aSize;
 
-        varying vec2 vUv;
-        varying float vEnergyFactor;
+        varying float vAlpha;
 
         void main() {
-            vUv = uv;
-            vEnergyFactor = uEnergyLevel; // Fragment Shader로 에너지 레벨 전달
-
-            // 천천히 빨려 들어가는 무한 줌인 효과 유지
             vec3 modPos = position;
             modPos.z = mod(position.z + uTime * 200.0 + 5000.0, 10000.0) - 5000.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
-            
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float dist = distance(uExplosionCenter, screenPos);
             
-            // 1. 충격파 로직 수정: 오직 uShockStrength(폭발) 상태에서만 입자를 밀어냄
-            // 누르고 있을 때(uShockStrength=0)는 입자가 밀려나지 않고 배경 유지
-            float pushForce = exp(-dist * 3.0) * uShockStrength * 250.0; 
+            // 1. 아무것도 안 할 때는 전체 별 투명도 20% (0.2) 고정
+            vAlpha = 0.2;
+
+            // 2. 전체 색상이 변하는 문제 해결: 마우스 중심부 근처만 밝아지도록 국소화
+            float localEffect = exp(-dist * 5.0); 
+            vAlpha += localEffect * uEnergyLevel * 0.8; // 마우스 근처만 최대 1.0(100%)까지 선명해짐
+
+            // 3. 파티클 크기 팽창 삭제 (블러/뭉개짐 원인 제거)
+            float pushForce = localEffect * uShockStrength * 400.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
-            // 최종 위치 계산: pushForce가 0이면 mvPosition 유지 (배경 안정화)
             vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * pushForce, pushForce * 0.1, 0.0));
             gl_Position = finalPosition;
-            gl_PointSize = aSize * (1.0 + uShockStrength * 5.0); // 폭발 시 입자 거대화
+            gl_PointSize = aSize; // 크기를 그대로 유지하여 픽셀의 선명함 보장
         }
     </script>
 
     <script id="fragmentShader" type="x-shader/x-fragment">
-        varying float vEnergyFactor;
+        varying float vAlpha;
         
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 2. 밝기 로직 수정: vEnergyFactor(누르는 강도)가 클수록 입자가 '환하게 빛나게' (10% 더 밝게)
-            // 누르고 있을 때 배경 별들의 색상이 100% 밝게 유지되어 어두워지는artifact 제거
-            vec3 color = mix(vec3(0.02, 0.08, 0.2), vec3(0.9, 1.0, 1.0), vEnergyFactor);
-            gl_FragColor = vec4(color, mix(0.6, 1.0, vEnergyFactor));
+            // 4. 불필요한 색상 믹스 삭제. 오직 깨끗한 흰색 픽셀로만 렌더링
+            gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
         }
     </script>
 
     <script>
         let scene, camera, renderer, particlesMaterial;
-        let bigBangEffect; 
+        let waveEffect; 
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
         
-        // 상태 및 연출 변수 정리
-        let energyLevel = 0.0;    // 에너지 축적 상태 (밝기) - Uniform uEnergyLevel
-        let shockStrength = 0.0;  // 폭발 충격파 강도 (입자 push) - Uniform uShockStrength
-        
-        let flashOpacity = 0.0; 
-        let flashScale = 0.0;
+        let energyLevel = 0.0;    
+        let shockStrength = 0.0;  
+        let waveOpacity = 0.0; 
+        let waveScale = 0.0;
 
         let isHolding = false;
         let lastHeldX = 0, lastHeldY = 0;
 
         const meteors = [];
-
         const PARTICLE_COUNT = 125000;
         const SPACE_RANGE = 10000;
 
@@ -103,7 +95,7 @@
         animate();
 
         function init() {
-            bigBangEffect = document.getElementById('bigBangEffect');
+            waveEffect = document.getElementById('waveEffect');
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
@@ -123,12 +115,11 @@
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
-            // 3. Uniforms 업데이트: 에너지 레벨과 충격파 강도를 분리하여 셰이더로 전달
             particlesMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     uTime: { value: 0.0 },
-                    uEnergyLevel: { value: 0.0 },     // 에너지 축적 상태
-                    uShockStrength: { value: 0.0 },   // 폭발 충격파 강도
+                    uEnergyLevel: { value: 0.0 },     
+                    uShockStrength: { value: 0.0 },   
                     uExplosionCenter: { value: new THREE.Vector2(0, 0) }
                 },
                 vertexShader: document.getElementById('vertexShader').textContent,
@@ -166,7 +157,7 @@
             const meteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffffff, 
                 transparent: true, 
-                opacity: 0.6,
+                opacity: 0.4,
                 blending: THREE.AdditiveBlending,
                 depthTest: false
             });
@@ -228,18 +219,13 @@
             lastHeldX = clientX;
             lastHeldY = clientY;
             
-            // 누르기 시작: 에너지 축적 상태로 전환
-            energyLevel = 1.0;     // 배경 별들을 즉시 환하게 밝게
-            shockStrength = 0.0;   // 충격파는 0으로 고정 (배경 유지)
-            
-            flashOpacity = 1.0;
-            flashScale = 0.5; 
+            energyLevel = 1.0;     
+            shockStrength = 0.0;   
         }
 
         function triggerHoldEnd() {
             isHolding = false; 
-            // 손가락을 떼는 순간: 오직 이때만 폭발 충격파를 트리거 (Spiking to 1.0)
-            shockStrength = 1.0;
+            shockStrength = 1.0; // 손 뗄 때만 파티클 밀어냄
         }
 
         function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
@@ -271,47 +257,38 @@
                 }
             });
 
-            // 시간 기반 애니메이션 팩터 계산
-            const pulseTime = time * 0.005; // 파장 속도 조절
-
-            // 4. 지속/팽창 로직 업데이트: 일렁이는 파장 및 배경 유지 적용
+            // 누르고 있을 때: 선명한 링(Ring) 파장 일렁임
             if (isHolding) {
-                // 누르고 있을 때: 일렁이는 파장 시각화 + **배경 우주 유지**
                 energyLevel = 1.0; 
-                shockStrength = 0.0; // **CRUCIAL FIX**: 누르고 있을 때 충격파 0 고정 (입자 배경 유지)
+                shockStrength = 0.0; 
                 
-                // HTML 빛 무리 진동 (0.8 ~ 1.0)
-                flashOpacity = 0.9 + Math.sin(pulseTime * 2.0) * 0.1; 
-                // HTML 빛 무리 크기 진동 및 절반 축소 (최대 14배 진동)
-                const baseHoldScale = 14.0;
-                flashScale = baseHoldScale + Math.sin(pulseTime) * 1.0; 
+                // 크기와 투명도가 맥박처럼 뛰는 파장
+                waveScale = 3.0 + Math.sin(time * 0.01) * 0.5; 
+                waveOpacity = 0.5 + Math.sin(time * 0.015) * 0.5; 
             } else {
-                // 손을 떼면 기존의 팽창 및 페이드아웃
-                shockStrength *= 0.975;  // 충격파 서서히 감쇄 (burst)
-                energyLevel *= 0.965;    // 밝기 서서히 감쇄
+                // 손을 뗄 때: 선명한 링이 크게 팽창하며 사라짐
+                shockStrength *= 0.96;  
+                energyLevel *= 0.95;    
                 
-                // 손을 떼는 순간 극적으로 팽창하되 최대 크기는 절반(40배)으로 제한
-                const maxExplosionScale = 40.0;
-                flashScale += (maxExplosionScale - flashScale) * 0.03; 
-                flashOpacity *= 0.965; // HTML 빛 무리 페이드아웃
+                waveScale += (40.0 - waveScale) * 0.04; 
+                waveOpacity *= 0.94; 
             }
 
-            // 5. 업데이트된 Uniforms 셰이더로 전달
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
             particlesMaterial.uniforms.uShockStrength.value = shockStrength;
             particlesMaterial.uniforms.uTime.value = time * 0.001; 
             
             if(isHolding) {
-                bigBangEffect.style.left = lastHeldX + 'px';
-                bigBangEffect.style.top = lastHeldY + 'px';
+                waveEffect.style.left = lastHeldX + 'px';
+                waveEffect.style.top = lastHeldY + 'px';
             }
 
-            if (isHolding || flashOpacity > 0.005) {
-                bigBangEffect.style.transform = `translate(-50%, -50%) scale(${flashScale})`;
-                bigBangEffect.style.opacity = flashOpacity;
-            } else if (flashScale > 0) {
-                flashScale = 0;
-                bigBangEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+            if (isHolding || waveOpacity > 0.005) {
+                waveEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
+                waveEffect.style.opacity = waveOpacity;
+            } else if (waveScale > 0) {
+                waveScale = 0;
+                waveEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
