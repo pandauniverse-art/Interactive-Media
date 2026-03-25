@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Cosmic Art</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles;
+        let mouseX = 0, mouseY = 0;
+
+        init();
+        animate();
+
+        function init() {
+            // 1. 씬 및 카메라 설정
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.z = 500; // 카메라를 뒤로 뺌
+
+            // 2. 우주 파티클 생성 (만 개)
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            for (let i = 0; i < 10000; i++) {
+                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // x
+                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // y
+                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // z
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+            const material = new THREE.PointsMaterial({ color: 0xffffff, size: 2 });
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            // 3. 렌더러 설정
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // 4. 마우스 이벤트 리스너 등록
+            document.addEventListener('mousemove', onDocumentMouseMove);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onDocumentMouseMove(event) {
+            // 마우스 좌표를 화면 중앙 기준으로 -1 ~ 1 사이 값으로 정규화
+            mouseX = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+            mouseY = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 5. 마우스 위치에 따라 카메라 위치 조정 (핵심 인터랙션)
+            // 완만한 움직임을 위해 목표값에 서서히 다가가도록 계산
+            const targetX = mouseX * 200; 
+            const targetY = -mouseY * 200; 
+
+            camera.position.x += (targetX - camera.position.x) * 0.05;
+            camera.position.y += (targetY - camera.position.y) * 0.05;
+            camera.lookAt(scene.position); // 항상 중앙을 바라봄
+
+            // 파티클 자체도 서서히 회전시킴
+            particles.rotation.y += 0.001;
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
