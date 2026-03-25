@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space Big Bang Media Art - Final</title>
+    <title>Deep Space Big Bang Media Art - Sustained Energy</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 블러(box-shadow) 제거, 밝기 10% 증가, 더 선명한 빛 확산 */
         #bigBangEffect {
             position: fixed;
             width: 10vmin; 
             height: 10vmin;
-            /* 중심부 흰색 영역을 넓히고 중간 단계의 밝기와 불투명도를 올려 10% 더 밝게 세팅 */
             background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,225,255,0.9) 30%, rgba(255,255,255,0) 80%);
             border-radius: 50%;
             transform: translate(-50%, -50%) scale(0); 
@@ -21,7 +19,6 @@
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
-            /* box-shadow 제거됨 */
         }
     </style>
 </head>
@@ -67,7 +64,6 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 폭발 시 파티클 색상도 기존보다 약 10% 밝게 세팅 (0.8, 0.9 -> 0.9, 1.0)
             vec3 color = mix(vec3(0.02, 0.08, 0.2), vec3(0.9, 1.0, 1.0), vDistanceFactor);
             gl_FragColor = vec4(color, mix(0.6, 1.0, vDistanceFactor));
         }
@@ -82,6 +78,10 @@
         let explosionTime = 0.0;
         let flashOpacity = 0.0; 
         let flashScale = 0.0;
+
+        // 1. 상태 변수 추가: 누르고 있는지 확인
+        let isHolding = false;
+        let lastHeldX = 0, lastHeldY = 0;
 
         const meteors = [];
 
@@ -135,10 +135,15 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // 2. 이벤트 리스너 업데이트: 누르기 시작, 떼기 이벤트 추가
             document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mousedown', onClick);
+            document.addEventListener('mousedown', onMouseDown); // 누르기 시작
+            document.addEventListener('mouseup', triggerHoldEnd); // 손 떼기
+
             document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', triggerHoldEnd, { passive: false }); // 터치 떼기
+
             window.addEventListener('resize', onWindowResize);
         }
 
@@ -188,22 +193,46 @@
             particlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
-        function onMouseMove(event) { updateExplosionCenter(event.clientX, event.clientY); }
-        function onTouchMove(event) { if (event.touches.length > 0) updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); }
-
-        function triggerBigBang(clientX, clientY) {
-            explosionTime = 1.0;
-            flashOpacity = 1.0;
-            flashScale = 0.5; 
-            
-            bigBangEffect.style.left = clientX + 'px';
-            bigBangEffect.style.top = clientY + 'px';
+        function onMouseMove(event) { 
+            updateExplosionCenter(event.clientX, event.clientY); 
+            if(isHolding) { // 누르고 있을 때 움직이면 빛 위치 업데이트
+                lastHeldX = event.clientX;
+                lastHeldY = event.clientY;
+            }
+        }
+        function onTouchMove(event) { 
+            if (event.touches.length > 0) {
+                const touch = event.touches[0];
+                updateExplosionCenter(touch.clientX, touch.clientY); 
+                if(isHolding) { // 터치 중 움직이면 빛 위치 업데이트
+                    lastHeldX = touch.clientX;
+                    lastHeldY = touch.clientY;
+                }
+            }
         }
 
-        function onClick(event) { triggerBigBang(event.clientX, event.clientY); }
+        // 3. 누르기/떼기 로직 구현
+        function triggerHoldStart(clientX, clientY) {
+            isHolding = true; // 누르고 있는 상태로 변경
+            lastHeldX = clientX;
+            lastHeldY = clientY;
+            
+            // 초기 폭발 및 빛 상태 설정 (최고 강도)
+            explosionTime = 1.0;
+            flashOpacity = 1.0;
+            flashScale = 0.5; // 즉시 나타나게 함
+        }
+
+        function triggerHoldEnd() {
+            isHolding = false; // 손을 뗀 상태로 변경
+        }
+
+        function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
         function onTouchStart(event) {
             if (event.touches.length > 0) {
-                triggerBigBang(event.touches[0].clientX, event.touches[0].clientY);
+                // 터치 시 화면 스크롤 방지 필수
+                event.preventDefault(); 
+                triggerHoldStart(event.touches[0].clientX, event.touches[0].clientY);
                 updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY);
             }
         }
@@ -228,18 +257,33 @@
                 }
             });
 
-            // 지속 시간 2배 증가: 감소 수치를 절반 수준으로 조정 (0.95 -> 0.975)
-            explosionTime *= 0.975; 
+            // 4. 누르고 있을 때 지속 연출 로직 통합
+            if (isHolding) {
+                // 누르고 있을 때는 최고 강도로 고정 (응축된 에너지 유지)
+                explosionTime = 1.0; 
+                flashOpacity = 1.0;
+                // 커지는 크기는 제한 (폭발 전 응축 상태)
+                flashScale = Math.min(flashScale + 2.0, 30.0); // 30배까지만 커져서 유지
+            } else {
+                // 손을 떼면 기존의 팽창 및 페이드아웃 적용
+                explosionTime *= 0.975; // 파티클 충격파 감쇄
+                flashOpacity *= 0.965; // 빛 페이드아웃
+                // 손을 떼는 순간 극적으로 팽창
+                flashScale += (80.0 - flashScale) * 0.02; 
+            }
+
             particlesMaterial.uniforms.uExplosionTime.value = explosionTime;
             particlesMaterial.uniforms.uTime.value = time * 0.001; 
             
-            // 빛 효과 지속 시간 2배 증가
-            if (flashOpacity > 0.005) {
-                // 커지는 속도를 늦춰 긴 시간에 맞춤
-                flashScale += (80.0 - flashScale) * 0.02; 
-                // 투명도 감소 수치를 늦춰(0.93 -> 0.965) 약 2배 오래 남아있게 조정
-                flashOpacity *= 0.965; 
-                
+            // 5. 지속 연출에 맞춰 HTML 빛 효과 업데이트
+            // 누르고 있을 때 빛 위치 업데이트
+            if(isHolding) {
+                bigBangEffect.style.left = lastHeldX + 'px';
+                bigBangEffect.style.top = lastHeldY + 'px';
+            }
+
+            // 지속/팽창/페이드아웃에 따른 가시성 조절
+            if (isHolding || flashOpacity > 0.005) {
                 bigBangEffect.style.transform = `translate(-50%, -50%) scale(${flashScale})`;
                 bigBangEffect.style.opacity = flashOpacity;
             } else if (flashScale > 0) {
