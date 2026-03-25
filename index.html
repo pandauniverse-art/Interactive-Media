@@ -3,36 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Ray Core & Seamless Burst</title>
+    <title>Deep Space - Ray Core & Seamless Burst (Fixed)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
         #rayEffect {
             position: fixed;
-            /* 1. 크기를 기존 20vmin에서 8vmin으로 40% 수준으로 축소 */
-            width: 8vmin; 
-            height: 8vmin;
+            /* 클릭 시 Scale 0부터 시작하기 위해 초기 크기를 0vmin으로 설정 */
+            width: 0vmin; 
+            height: 0vmin;
+            /* 40% 수준으로 축소된 최대 크기 목표값 (JS에서 관리) */
+            --max-size: 8vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
             
-            /* 2. 원 형태가 아닌 날카로운 레이(Ray) 형태의 빛줄기 구현 */
+            /* 날카로운 레이(Ray) 형태 디자인 유지 */
             background: 
                 repeating-conic-gradient(from 0deg, transparent 0deg, rgba(200,230,255,0.9) 2deg, transparent 4deg, transparent 45deg),
                 radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%);
             border-radius: 50%;
             
-            /* 3. 밝기 200% 이상 펌핑 (기존 대비 훨씬 밝게 설정) */
-            filter: blur(2px) brightness(4.0); 
+            /* 최대 차징 시 밝기 200% 증폭 (brightness(10.0)로 설정) */
+            filter: blur(2px) brightness(10.0); 
             box-shadow: 0 0 50px 20px rgba(100, 200, 255, 0.8), 0 0 100px 40px rgba(255, 255, 255, 0.5);
             
+            /* 회전 애니메이션 translate 속성 깨지지 않게 수정 */
             animation: spin 10s linear infinite;
         }
 
-        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+        @keyframes spin { 
+            /* translate는 JS에서 제어하므로 rotate만 애니메이션 */
+            100% { transform: translate(-50%, -50%) rotate(360deg); } 
+        }
     </style>
 </head>
 <body>
@@ -54,7 +60,8 @@
             
             vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
             
-            // 모이는 효과 (끊김 없이 부드럽게)
+            // 위치 동기화 FIX: Perspective Projection 상의 파티클 depth를 고려하여 
+            // Normalized Device Coordinates(uExplosionCenter)를 World Space로 역계산
             vec2 targetMvXy = uExplosionCenter * abs(mvPosition.z) * 0.8; 
             vec2 mvDirToCenter = targetMvXy - mvPosition.xy;
             float mvDist = length(mvDirToCenter);
@@ -85,7 +92,8 @@
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
-            gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha); 
+            // 1. 아무것도 입력되지 않았을 때 기본 밝기 3배 증가 (vec3(3.0))
+            gl_FragColor = vec4(vec3(3.0), vAlpha); 
         }
     </script>
 
@@ -98,18 +106,15 @@
         varying float vBurstAlpha;
 
         void main() {
-            // 폭발 중심에서 화면 밖을 향해 엄청난 속도로 이동
             vec3 finalPos = position + aVelocity * uBurstTime * 3000.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
             
-            // 폭발 시작 위치를 마우스 포인터에 맞춤
             mvPosition.xy += uBurstCenter * 2000.0; 
 
             gl_Position = projectionMatrix * mvPosition;
             
-            // 시간이 지날수록 크기와 투명도가 줄어들며 사라짐
-            float progress = smoothstep(0.0, 1.5, uBurstTime); // 1.5초 동안 폭발
+            float progress = smoothstep(0.0, 1.5, uBurstTime); 
             gl_PointSize = aSize * (1.0 - progress); 
             vBurstAlpha = 1.0 - progress; 
         }
@@ -141,17 +146,16 @@
         let lastHeldX = window.innerWidth / 2;
         let lastHeldY = window.innerHeight / 2;
         
-        // 컷(Cut) 방지용 목표값 및 현재값 보간 변수
         let targetProgress = 0.0;
         let currentProgress = 0.0; 
-        let rayScale = 0.0;
-        let rayOpacity = 0.0;
+        let rayScale = 0.0; // 스케일 0에서 시작
+        let rayOpacity = 0.0; // 밝기 0에서 시작
         
         let burstTime = 0.0;
         let isBursting = false;
 
         const BG_PARTICLE_COUNT = 80000;
-        const BURST_PARTICLE_COUNT = 30000; // 한 번에 터질 파티클 개수
+        const BURST_PARTICLE_COUNT = 30000; 
         const SPACE_RANGE = 10000;
 
         init();
@@ -163,7 +167,6 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
 
-            // --- 1. 배경 우주 파티클 세팅 ---
             const bgGeom = new THREE.BufferGeometry();
             const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
             const bgSizes = new Float32Array(BG_PARTICLE_COUNT);
@@ -192,8 +195,6 @@
             bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
             scene.add(bgParticles);
 
-
-            // --- 2. 폭발 전용(새로운) 파티클 세팅 ---
             const burstGeom = new THREE.BufferGeometry();
             const burstPos = new Float32Array(BURST_PARTICLE_COUNT * 3);
             const burstVel = new Float32Array(BURST_PARTICLE_COUNT * 3);
@@ -201,18 +202,14 @@
 
             for (let i = 0; i < BURST_PARTICLE_COUNT; i++) {
                 burstPos[i * 3] = 0; burstPos[i * 3 + 1] = 0; burstPos[i * 3 + 2] = 0;
-                
-                // 화면 밖으로 퍼져나갈 구형(Spherical) 방향 벡터 생성
                 const u = Math.random();
                 const v = Math.random();
                 const theta = u * 2.0 * Math.PI;
                 const phi = Math.acos(2.0 * v - 1.0);
                 const speed = 0.5 + Math.random() * 1.5;
-
                 burstVel[i * 3] = Math.sin(phi) * Math.cos(theta) * speed;
                 burstVel[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * speed;
                 burstVel[i * 3 + 2] = Math.cos(phi) * speed;
-
                 burstSizes[i] = 1.0 + Math.random() * 4.0;
             }
             burstGeom.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
@@ -229,12 +226,11 @@
                 blending: THREE.AdditiveBlending,
                 depthTest: false,
                 transparent: true,
-                visible: false // 처음엔 안 보임
+                visible: false 
             });
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
-            // 렌더러
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -243,54 +239,68 @@
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mousedown', onMouseDown); 
             document.addEventListener('mouseup', triggerHoldEnd); 
-
             document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
             document.addEventListener('touchend', triggerHoldEnd, { passive: false }); 
-
             window.addEventListener('resize', onWindowResize);
         }
 
         function updateExplosionCenter(clientX, clientY) {
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
-            targetX = mouseX * 80; 
-            targetY = mouseY * 80;
+            
+            // 카메라 드리프트는 기본 상태에서만 적용 (Hold 중에는 FIX를 위해 0으로)
+            if(!isHolding) {
+                targetX = mouseX * 80; 
+                targetY = mouseY * 80;
+            } else {
+                targetX = 0;
+                targetY = 0;
+            }
+            
+            // 위치 동기화 FIX:Normalized Device Coordinates 업데이트
             bgParticlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
         function onMouseMove(event) { 
-            updateExplosionCenter(event.clientX, event.clientY); 
+            // **위치 동기화 FIX**: Hold 중에도 실시간으로 픽셀 좌표 캡처 및 Shader 업데이트
             if(isHolding) { 
                 lastHeldX = event.clientX;
                 lastHeldY = event.clientY;
+                updateExplosionCenter(event.clientX, event.clientY); 
+            } else {
+                updateExplosionCenter(event.clientX, event.clientY); 
             }
         }
         function onTouchMove(event) { 
             if (event.touches.length > 0) {
                 const touch = event.touches[0];
-                updateExplosionCenter(touch.clientX, touch.clientY); 
                 if(isHolding) { 
                     lastHeldX = touch.clientX;
                     lastHeldY = touch.clientY;
+                    updateExplosionCenter(touch.clientX, touch.clientY); 
+                } else {
+                    updateExplosionCenter(touch.clientX, touch.clientY); 
                 }
             }
         }
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
-            targetProgress = 1.0; // 모이기 시작 (목표값 1)
+            targetProgress = 1.0;
             lastHeldX = clientX;
             lastHeldY = clientY;
+            
+            // 클릭 순간 카메라 움직임 차단 (위치 동기화 FIX)
+            targetX = 0; targetY = 0;
+            updateExplosionCenter(clientX, clientY);
         }
 
         function triggerHoldEnd() {
             if (isHolding) { 
                 isHolding = false; 
-                targetProgress = 0.0; // 해제 시 서서히 0으로 (컷 방지)
-                
-                // 새로운 파티클 터트리기 (폭발)
-                if(currentProgress > 0.1) { // 조금이라도 모였을 때 터지도록
+                targetProgress = 0.0;
+                if(currentProgress > 0.1) {
                     isBursting = true;
                     burstTime = 0.0;
                     burstParticlesMaterial.visible = true;
@@ -317,41 +327,45 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
+            // 카메라 드리프트 보간
             camera.position.x += (targetX - camera.position.x) * 0.005;
             camera.position.y += (targetY - camera.position.y) * 0.005;
             camera.lookAt(scene.position);
 
-            // 컷 방지: 보간(Lerp)을 사용하여 수치가 튀지 않고 부드럽게 이어짐
-            let easing = isHolding ? 0.005 : 0.02; // 모일 땐 천천히, 풀릴 땐 살짝 더 빠르게
+            // 보간 (Lerp) 유지
+            let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
             
-            // HTML 빛 이펙트 (레이 형태) 스케일 및 투명도 보간
-            let targetScale = isHolding ? (0.5 + currentProgress * 2.0) : 0.0;
-            let targetOpacity = isHolding ? currentProgress : 0.0;
+            // **클릭 차징 애니메이션 (Scale 0부터 시작, 다 차면 목표 크기 100%)**
+            // CSS 변수 --max-size(8vmin)에 맞춰 JS 스케일링
+            rayEffect.style.width = `calc(var(--max-size) * ${currentProgress})`;
+            rayEffect.style.height = `calc(var(--max-size) * ${currentProgress})`;
             
-            rayScale += (targetScale - rayScale) * 0.05;
-            rayOpacity += (targetOpacity - rayOpacity) * 0.05;
+            rayScale = currentProgress; 
+            rayOpacity = currentProgress; 
 
             bgParticlesMaterial.uniforms.uGatherProgress.value = currentProgress;
             bgParticlesMaterial.uniforms.uTime.value = time * 0.001; 
 
-            // 폭발 파티클 타이머 업데이트
             if (isBursting) {
                 burstTime += 0.016;
                 burstParticlesMaterial.uniforms.uBurstTime.value = burstTime;
-                if (burstTime > 1.5) { // 1.5초 후 파티클 감춤
+                if (burstTime > 1.5) {
                     isBursting = false;
                     burstParticlesMaterial.visible = false;
                 }
             }
             
-            // CSS 레이 이펙트 업데이트
+            // CSS 레이 이펙트 포인트 동기화 (FIX)
             rayEffect.style.left = lastHeldX + 'px';
             rayEffect.style.top = lastHeldY + 'px';
             
+            // **클릭 차징 애니메이션 ( Scale 0에서 1로 부드럽게 팽창)**
             if (rayScale > 0.01) {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
                 rayEffect.style.opacity = rayOpacity;
+            } else {
+                rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
