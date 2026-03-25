@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - High Density Micro Burst</title>
+    <title>Deep Space - Massive Black Hole Charge</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -62,18 +62,28 @@
             float phase = fract(uTime * 0.1 + aSize * 15.0); 
             float easePhase = phase * phase; 
             
-            vec2 gatherMove = mvDirToCenter * easePhase * uGatherProgress;
-            vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * uGatherProgress * 1.5;
+            // 1. 시간이 지날수록 급격하게 모이도록 가속도(지수 곡선) 적용
+            float powerProgress = pow(uGatherProgress, 2.0);
+
+            // 중심으로 끌어당기는 힘
+            vec2 gatherMove = mvDirToCenter * easePhase * powerProgress;
+            
+            // 2. 영향 범위 1.5배 늘림: 소용돌이(Swirl) 회전 반경 증폭 (1.5 * 1.5 = 2.25)
+            vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * powerProgress * 2.25;
 
             mvPosition.xy += gatherMove + mvSwirl;
-            mvPosition.z -= easePhase * 800.0 * uGatherProgress; 
+            
+            // 3. 밀도 2배 더 많게: 화면 밖 깊은 곳(Z축)에서 끌어오는 거리를 2배로 증가 (800.0 -> 1600.0)
+            mvPosition.z -= easePhase * 1600.0 * powerProgress; 
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
             
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float distToCenter = distance(uExplosionCenter, screenPos);
-            float localEffect = exp(-distToCenter * 5.0);
+            
+            // 4. 빛나는 범위 1.5배 넓힘: 거리 감쇠 수치를 5.0에서 3.3으로 낮춰 더 넓은 영역의 입자들이 빛나게 함
+            float localEffect = exp(-distToCenter * 3.3);
 
             vAlpha = 0.3 + (localEffect * uGatherProgress * 3.0); 
         }
@@ -97,7 +107,6 @@
         varying float vBurstAlpha;
 
         void main() {
-            // 1. 폭발 속도: 기존(300.0)에서 약 30% 상향된 400.0으로 설정
             vec3 finalPos = position + aVelocity * uBurstTime * 400.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
@@ -105,7 +114,6 @@
 
             gl_Position = projectionMatrix * mvPosition;
             
-            // 속도가 약간 빨라진 만큼 생존 시간을 12초로 맞춤 조정
             float progress = smoothstep(0.0, 12.0, uBurstTime); 
             gl_PointSize = aSize * (1.0 - progress); 
             vBurstAlpha = 1.0 - progress; 
@@ -147,7 +155,6 @@
         let isBursting = false;
 
         const BG_PARTICLE_COUNT = 80000;
-        // 2. 파티클 개수: 기존 6만 개에서 2배 증가한 12만 개
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
 
@@ -203,8 +210,6 @@
                 burstVel[i * 3] = Math.sin(phi) * Math.cos(theta) * speed;
                 burstVel[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * speed;
                 burstVel[i * 3 + 2] = Math.cos(phi) * speed;
-                
-                // 3. 파티클 크기: 기존 대비 3배 작게 설정 (0.33 ~ 1.66 수준)
                 burstSizes[i] = (1.0 + Math.random() * 4.0) / 3.0; 
             }
             burstGeom.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
