@@ -3,20 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cosmic Explosion Media Art - Balanced</title>
+    <title>Cosmic Flash Media Art - Linear</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
+        
+        /* 1. 화이트 플래시 오버레이 스타일 추가 */
+        #whiteOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff; /* 하얀색 */
+            opacity: 0; /* 처음에 투명 */
+            pointer-events: none; /* 클릭 방해 금지 */
+            z-index: 100; /* 맨 위에 표시 */
+        }
     </style>
 </head>
 <body>
+    <div id="whiteOverlay"></div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 
     <script id="vertexShader" type="x-shader/x-vertex">
         uniform float uTime;
@@ -35,10 +44,9 @@
             float dist = distance(uExplosionCenter, screenPos);
             
             vDistanceFactor = mix(1.0, 0.0, uExplosionTime);
-            float force = mix(1.0, 0.1, dist) * uExplosionTime * 100.0; // 넓어진 공간에 맞춰 폭발 힘 약간 상향
+            float force = mix(1.0, 0.1, dist) * uExplosionTime * 100.0;
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
-            // 폭발 방향에 z축 요소를 약간 추가하여 입체감 향상
             vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * force, force * 0.2, 0.0));
             gl_Position = finalPosition;
             gl_PointSize = aSize * (1.0 + uExplosionTime * 3.0);
@@ -53,40 +61,42 @@
             if (dist > 0.5) discard;
             
             vec3 color = mix(vec3(0.01, 0.1, 0.2), vec3(1.0, 1.0, 1.0), vDistanceFactor);
-            gl_FragColor = vec4(color, vDistanceFactor * 0.8); // 투명도 약간 감소
+            gl_FragColor = vec4(color, vDistanceFactor * 0.8);
         }
     </script>
 
     <script>
-        let scene, camera, renderer, composer, bloomPass, particlesMaterial;
+        let scene, camera, renderer, particlesMaterial;
+        let whiteOverlay; // 화이트 오버레이 div 참조
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
         let explosionTime = 0.0;
+        let flashOpacity = 0.0; // 화이트 오버레이 투명도 상태
 
-        // --- 중요: 밸런스 조정 변수 ---
-        const PARTICLE_COUNT = 250000;        // 1. 파티클 수 절반으로 감소 (25만 개)
-        const SPACE_RANGE = 10000;           // 3. 우주 공간 범위 2배로 확장 (기존 5000)
-        const BLOOM_INTENSITY_NORMAL = 0.5;
-        const BLOOM_INTENSITY_EXPLOSION = 2.5; // 2. 클릭 시 번쩍임 밝기 1/2로 감소 (기존 5.0)
+        // 밸런스 조정 변수
+        const PARTICLE_COUNT = 250000;
+        const SPACE_RANGE = 10000;
 
         init();
         animate();
 
         function init() {
+            // 화이트 오버레이 div 가져오기
+            whiteOverlay = document.getElementById('whiteOverlay');
+
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000); // 뷰 거리 확장
-            camera.position.z = 3000; // 넓어진 공간을 보기 위해 카메라를 더 뒤로 이동
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
+            camera.position.z = 3000;
 
             const geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(PARTICLE_COUNT * 3);
             const sizes = new Float32Array(PARTICLE_COUNT);
 
-            // 확광해진 공간 범위(SPACE_RANGE) 적용
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                positions[i * 3] = THREE.MathUtils.randFloatSpread(SPACE_RANGE); // x
-                positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(SPACE_RANGE); // y
-                positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(SPACE_RANGE); // z
-                sizes[i] = Math.random() * 2.5; // 입자 크기 약간 확대
+                positions[i * 3] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
+                positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
+                positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
+                sizes[i] = Math.random() * 2.5;
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -113,17 +123,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // 포스트 프로세싱 설정
-            composer = new THREE.EffectComposer(renderer);
-            composer.addPass(new THREE.RenderPass(scene, camera));
-
-            bloomPass = new THREE.UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                BLOOM_INTENSITY_NORMAL, // 초기 강도
-                0.5, // 반경 약간 확대
-                0.8 // 임계값 약간 하향
-            );
-            composer.addPass(bloomPass);
+            // 4. 포스트 프로세싱 관련 초기화 코드 제거
 
             // 이벤트 리스너
             document.addEventListener('mousemove', onMouseMove);
@@ -140,7 +140,6 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            // 넓어진 공간에 맞춰 카메라 움직임 범위 확대
             targetX = mouseX * 500; 
             targetY = mouseY * 500;
             
@@ -152,14 +151,15 @@
 
         function onClick(event) {
             explosionTime = 1.0;
-            bloomPass.strength = BLOOM_INTENSITY_EXPLOSION; // 2.5로 번쩍임
+            // 5. 클릭 시 화이트 플래시 오버레이 투명도 최대로 설정
+            flashOpacity = 1.0;
         }
 
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
+            // composer.setSize 제거
         }
 
         function animate(time) {
@@ -169,14 +169,16 @@
             camera.position.y += (targetY - camera.position.y) * 0.05;
             camera.lookAt(scene.position);
 
-            explosionTime *= 0.96; // 0.95 -> 0.96으로 폭발 페이드아웃 약간 속도 감소
+            explosionTime *= 0.96;
             particlesMaterial.uniforms.uExplosionTime.value = explosionTime;
             particlesMaterial.uniforms.uTime.value = time * 0.001;
             
-            // 블룸 강도 페이드아웃
-            bloomPass.strength += (BLOOM_INTENSITY_NORMAL - bloomPass.strength) * 0.05;
+            // 6. 화이트 플래시 오버레이 페이드아웃 계산 및 적용 (완만하게 감소)
+            flashOpacity *= 0.92; // explosionTime보다 약간 빠르게 감소하도록 설정
+            whiteOverlay.style.opacity = flashOpacity;
 
-            composer.render();
+            // 7. renderer.render() 로 직접 렌더링
+            renderer.render(scene, camera);
         }
     </script>
 </body>
