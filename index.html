@@ -3,54 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Massive Black Hole Charge</title>
+    <title>Deep Space - Overcharge & Massive Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
+        /* 기존 렌즈 플레어 코어 */
         #rayEffect {
             position: fixed;
-            width: 0vmin; 
-            height: 0vmin;
-            --max-size: 12vmin;
+            width: 20vmin; 
+            height: 20vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
-            
-            background: 
-                repeating-conic-gradient(from 0deg, transparent 0deg, rgba(200,230,255,0.9) 2deg, transparent 4deg, transparent 45deg),
-                radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%);
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.8) 15%, rgba(100,180,255,0.4) 40%, transparent 70%);
+            box-shadow: 0 0 100px 40px rgba(100, 200, 255, 0.4), 0 0 200px 80px rgba(255, 255, 255, 0.2);
             border-radius: 50%;
-            
-            filter: blur(2px) brightness(20.0); 
-            box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5);
-            
-            animation: spin 10s linear infinite;
+            filter: blur(12px) brightness(2.0); 
         }
 
-        @keyframes spin { 
-            100% { transform: translate(-50%, -50%) rotate(360deg); } 
+        /* 1. 폭발 버스트 이펙트 (image_1.png 사용) */
+        #burstEffect {
+            position: fixed;
+            width: 0vmin; /* 초기 크기 0 */
+            height: 0vmin;
+            --max-size: 30vmin; /* 폭발 시 최대 크기 (크게) */
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 101; /* rayEffect보다 앞에 */
+            mix-blend-mode: screen; /* 또는 add */
+            background-image: url('image_1.png'); /* image_1.png 사용 */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            filter: brightness(2.0); /* image_1.png를 더 밝게 */
+            
+        }
+
+        /* 2. 공기 파장 이펙트 (Shockwave/Refraction) */
+        #shockwaveEffect {
+            position: fixed;
+            width: 0vmin;
+            height: 0vmin;
+            --max-size: 150vmin; /* 화면 밖까지 퍼지게 */
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 102; /* 가장 앞에 */
+            mix-blend-mode: overlay; /* overlay 또는 soft-light로 굴절 느낌 */
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3); /* 희미한 테두리 */
+            background: radial-gradient(circle, transparent 70%, rgba(255, 255, 255, 0.1) 80%, transparent 90%);
+            box-shadow: 0 0 100px 20px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px) brightness(1.2); /* 배경 굴절 효과 */
         }
     </style>
 </head>
 <body>
     <div id="rayEffect"></div>
+    <div id="burstEffect"></div> <div id="shockwaveEffect"></div> <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-    <script id="bgVertexShader" type="x-shader/x-vertex">
+    <script id="vertexShader" type="x-shader/x-vertex">
         uniform float uTime;
-        uniform float uGatherProgress; 
+        uniform float uEnergyLevel;
+        uniform float uShockStrength;
+        uniform float uGatherStrength; 
         uniform vec2 uExplosionCenter;
         attribute float aSize;
 
         varying float vAlpha;
+        varying float vShock; 
+        varying float vGatherPhase; 
 
         void main() {
             vec3 modPos = position;
-            modPos.z = mod(position.z + uTime * 15.0 + 5000.0, 10000.0) - 5000.0;
+            modPos.z = mod(position.z + uTime * 18.0 + 5000.0, 10000.0) - 5000.0;
             
             vec4 mvPosition = modelViewMatrix * vec4(modPos, 1.0);
             
@@ -59,103 +89,72 @@
             float mvDist = length(mvDirToCenter);
             vec2 mvDirNorm = mvDist > 0.001 ? (mvDirToCenter / mvDist) : vec2(0.0);
 
-            float phase = fract(uTime * 0.1 + aSize * 15.0); 
+            float phase = fract(uTime * 0.13 + aSize * 15.0); 
+            vGatherPhase = phase * uGatherStrength; 
+
             float easePhase = phase * phase; 
             
-            // 1. 시간이 지날수록 급격하게 모이도록 가속도(지수 곡선) 적용
-            float powerProgress = pow(uGatherProgress, 2.0);
+            vec2 gatherMove = mvDirToCenter * easePhase * uGatherStrength;
+            vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * uGatherStrength * 1.5;
 
-            // 중심으로 끌어당기는 힘
-            vec2 gatherMove = mvDirToCenter * easePhase * powerProgress;
+            vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
+            float distToCenterScreen = distance(uExplosionCenter, screenPos);
+            float localEffect = exp(-distToCenterScreen * 5.0);
             
-            // 2. 영향 범위 1.5배 늘림: 소용돌이(Swirl) 회전 반경 증폭 (1.5 * 1.5 = 2.25)
-            vec2 mvSwirl = vec2(-mvDirNorm.y, mvDirNorm.x) * mvDist * sin(phase * 3.14) * powerProgress * 2.25;
+            float pushForce = localEffect * uShockStrength * 1500.0; 
+            vec2 pushMove = -mvDirNorm * pushForce; 
 
-            mvPosition.xy += gatherMove + mvSwirl;
-            
-            // 3. 밀도 2배 더 많게: 화면 밖 깊은 곳(Z축)에서 끌어오는 거리를 2배로 증가 (800.0 -> 1600.0)
-            mvPosition.z -= easePhase * 1600.0 * powerProgress; 
+            mvPosition.xy += gatherMove + mvSwirl + pushMove;
+            mvPosition.z += pushForce * 0.1 - (easePhase * 800.0 * uGatherStrength); 
 
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
             
-            vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
-            float distToCenter = distance(uExplosionCenter, screenPos);
-            
-            // 4. 빛나는 범위 1.5배 넓힘: 거리 감쇠 수치를 5.0에서 3.3으로 낮춰 더 넓은 영역의 입자들이 빛나게 함
-            float localEffect = exp(-distToCenter * 3.3);
-
-            vAlpha = 0.3 + (localEffect * uGatherProgress * 3.0); 
+            vAlpha = 0.36 + (localEffect * uEnergyLevel * 25.0); 
+            vShock = uShockStrength * localEffect * 3.0;
         }
     </script>
 
-    <script id="bgFragmentShader" type="x-shader/x-fragment">
+    <script id="fragmentShader" type="x-shader/x-fragment">
         varying float vAlpha;
+        varying float vShock;
+        varying float vGatherPhase;
+        
         void main() {
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
-            gl_FragColor = vec4(vec3(3.0), vAlpha); 
-        }
-    </script>
-
-    <script id="burstVertexShader" type="x-shader/x-vertex">
-        uniform float uBurstTime;
-        uniform vec2 uBurstCenter;
-        attribute vec3 aVelocity;
-        attribute float aSize;
-
-        varying float vBurstAlpha;
-
-        void main() {
-            vec3 finalPos = position + aVelocity * uBurstTime * 400.0;
             
-            vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
-            mvPosition.xy += uBurstCenter * 2000.0; 
+            float gatherFade = 1.0 - smoothstep(0.8, 1.0, vGatherPhase);
 
-            gl_Position = projectionMatrix * mvPosition;
+            vec3 baseColor = vec3(1.0, 1.0, 1.0);
+            vec3 explosionColor = vec3(0.3, 0.9, 1.0); 
             
-            float progress = smoothstep(0.0, 12.0, uBurstTime); 
-            gl_PointSize = aSize * (1.0 - progress); 
-            vBurstAlpha = 1.0 - progress; 
-        }
-    </script>
-
-    <script id="burstFragmentShader" type="x-shader/x-fragment">
-        varying float vBurstAlpha;
-        void main() {
-            float dist = distance(gl_PointCoord, vec2(0.5));
-            if (dist > 0.5 || vBurstAlpha <= 0.0) discard;
+            vec3 finalColor = mix(baseColor, explosionColor, min(vShock, 1.0));
+            vec3 gatherColor = mix(finalColor, vec3(0.5, 0.9, 1.0), vGatherPhase);
             
-            vec3 coreColor = vec3(1.0, 1.0, 1.0);
-            vec3 edgeColor = vec3(0.3, 0.8, 1.0);
-            vec3 color = mix(edgeColor, coreColor, vBurstAlpha);
-            
-            gl_FragColor = vec4(color, vBurstAlpha);
+            gl_FragColor = vec4(gatherColor, (vAlpha + vShock) * gatherFade); 
         }
     </script>
 
     <script>
-        let scene, camera, renderer;
-        let bgParticlesMaterial, bgParticles;
-        let burstParticlesMaterial, burstParticles;
-        let rayEffect; 
+        let scene, camera, renderer, particlesMaterial;
+        let rayEffect, burstEffect, shockwaveEffect; // 새 요소 추가
         let mouseX = 0, mouseY = 0;
         let targetX = 0, targetY = 0;
         
-        let isHolding = false;
-        let lastHeldX = window.innerWidth / 2;
-        let lastHeldY = window.innerHeight / 2;
-        
-        let targetProgress = 0.0;
-        let currentProgress = 0.0; 
-        let rayScale = 0.0; 
-        let rayOpacity = 0.0; 
-        
-        let burstTime = 0.0;
-        let isBursting = false;
+        let energyLevel = 0.0;    
+        let shockStrength = 0.0;  
+        let gatherStrength = 0.0; 
+        let waveOpacity = 0.0; 
+        let waveScale = 0.0;
+        let explosionBrightness = 2.0; 
 
-        const BG_PARTICLE_COUNT = 80000;
-        const BURST_PARTICLE_COUNT = 120000; 
+        let isHolding = false;
+        let holdStartTime = -1; 
+        let lastHeldX = 0, lastHeldY = 0;
+
+        const meteors = [];
+        const PARTICLE_COUNT = 125000;
         const SPACE_RANGE = 10000;
 
         init();
@@ -163,73 +162,46 @@
 
         function init() {
             rayEffect = document.getElementById('rayEffect');
+            burstEffect = document.getElementById('burstEffect'); // 새 요소 가져오기
+            shockwaveEffect = document.getElementById('shockwaveEffect'); // 새 요소 가져오기
+
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
 
-            const bgGeom = new THREE.BufferGeometry();
-            const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
-            const bgSizes = new Float32Array(BG_PARTICLE_COUNT);
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(PARTICLE_COUNT * 3);
+            const sizes = new Float32Array(PARTICLE_COUNT);
 
-            for (let i = 0; i < BG_PARTICLE_COUNT; i++) {
-                bgPos[i * 3] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
-                bgPos[i * 3 + 1] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
-                bgPos[i * 3 + 2] = (Math.random() - 0.5) * SPACE_RANGE; 
-                bgSizes[i] = Math.random() * 2.0;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                positions[i * 3] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
+                positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(SPACE_RANGE);
+                positions[i * 3 + 2] = (Math.random() - 0.5) * SPACE_RANGE; 
+                sizes[i] = Math.random() * 2.0;
             }
-            bgGeom.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
-            bgGeom.setAttribute('aSize', new THREE.BufferAttribute(bgSizes, 1));
 
-            bgParticlesMaterial = new THREE.ShaderMaterial({
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+            particlesMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     uTime: { value: 0.0 },
-                    uGatherProgress: { value: 0.0 },  
+                    uEnergyLevel: { value: 0.0 },     
+                    uShockStrength: { value: 0.0 },   
+                    uGatherStrength: { value: 0.0 },  
                     uExplosionCenter: { value: new THREE.Vector2(0, 0) }
                 },
-                vertexShader: document.getElementById('bgVertexShader').textContent,
-                fragmentShader: document.getElementById('bgFragmentShader').textContent,
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent,
                 blending: THREE.AdditiveBlending,
                 depthTest: false,
                 transparent: true
             });
-            bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
-            scene.add(bgParticles);
 
-            const burstGeom = new THREE.BufferGeometry();
-            const burstPos = new Float32Array(BURST_PARTICLE_COUNT * 3);
-            const burstVel = new Float32Array(BURST_PARTICLE_COUNT * 3);
-            const burstSizes = new Float32Array(BURST_PARTICLE_COUNT);
+            const particles = new THREE.Points(geometry, particlesMaterial);
+            scene.add(particles);
 
-            for (let i = 0; i < BURST_PARTICLE_COUNT; i++) {
-                burstPos[i * 3] = 0; burstPos[i * 3 + 1] = 0; burstPos[i * 3 + 2] = 0;
-                const u = Math.random();
-                const v = Math.random();
-                const theta = u * 2.0 * Math.PI;
-                const phi = Math.acos(2.0 * v - 1.0);
-                const speed = 0.5 + Math.random() * 1.5;
-                burstVel[i * 3] = Math.sin(phi) * Math.cos(theta) * speed;
-                burstVel[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * speed;
-                burstVel[i * 3 + 2] = Math.cos(phi) * speed;
-                burstSizes[i] = (1.0 + Math.random() * 4.0) / 3.0; 
-            }
-            burstGeom.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
-            burstGeom.setAttribute('aVelocity', new THREE.BufferAttribute(burstVel, 3));
-            burstGeom.setAttribute('aSize', new THREE.BufferAttribute(burstSizes, 1));
-
-            burstParticlesMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    uBurstTime: { value: 0.0 },
-                    uBurstCenter: { value: new THREE.Vector2(0, 0) }
-                },
-                vertexShader: document.getElementById('burstVertexShader').textContent,
-                fragmentShader: document.getElementById('burstFragmentShader').textContent,
-                blending: THREE.AdditiveBlending,
-                depthTest: false,
-                transparent: true,
-                visible: false 
-            });
-            burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
-            scene.add(burstParticles);
+            createMeteors(10); 
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -239,67 +211,126 @@
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mousedown', onMouseDown); 
             document.addEventListener('mouseup', triggerHoldEnd); 
+
             document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
             document.addEventListener('touchend', triggerHoldEnd, { passive: false }); 
+
             window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMeteors(count) {
+            const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
+            meteorGeometry.rotateX(Math.PI / 2); 
+            
+            const meteorMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.4,
+                blending: THREE.AdditiveBlending,
+                depthTest: false
+            });
+
+            for(let i = 0; i < count; i++) {
+                const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
+                resetMeteor(meteor);
+                scene.add(meteor);
+                meteors.push(meteor);
+            }
+        }
+
+        function resetMeteor(meteor) {
+            meteor.position.set(
+                (Math.random() - 0.5) * 8000,
+                (Math.random() - 0.5) * 6000,
+                -4000 - Math.random() * 5000
+            );
+            meteor.userData.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 8, 
+                (Math.random() - 0.5) * 8 - 2, 
+                15 + Math.random() * 20 
+            );
+            meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
         function updateExplosionCenter(clientX, clientY) {
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
-            if(!isHolding) {
-                targetX = mouseX * 80; 
-                targetY = mouseY * 80;
-            } else {
-                targetX = 0;
-                targetY = 0;
-            }
-            bgParticlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
+            targetX = mouseX * 80; 
+            targetY = mouseY * 80;
+            
+            particlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
         function onMouseMove(event) { 
+            updateExplosionCenter(event.clientX, event.clientY); 
             if(isHolding) { 
                 lastHeldX = event.clientX;
                 lastHeldY = event.clientY;
-                updateExplosionCenter(event.clientX, event.clientY); 
-            } else {
-                updateExplosionCenter(event.clientX, event.clientY); 
             }
         }
         function onTouchMove(event) { 
             if (event.touches.length > 0) {
                 const touch = event.touches[0];
+                updateExplosionCenter(touch.clientX, touch.clientY); 
                 if(isHolding) { 
                     lastHeldX = touch.clientX;
                     lastHeldY = touch.clientY;
-                    updateExplosionCenter(touch.clientX, touch.clientY); 
-                } else {
-                    updateExplosionCenter(touch.clientX, touch.clientY); 
                 }
             }
         }
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
-            targetProgress = 1.0;
+            holdStartTime = -1; 
             lastHeldX = clientX;
             lastHeldY = clientY;
-            targetX = 0; targetY = 0;
-            updateExplosionCenter(clientX, clientY);
+            shockStrength = 0.0;   
         }
 
         function triggerHoldEnd() {
             if (isHolding) { 
                 isHolding = false; 
-                targetProgress = 0.0;
-                if(currentProgress > 0.1) {
-                    isBursting = true;
-                    burstTime = 0.0;
-                    burstParticlesMaterial.visible = true;
-                    burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
-                }
+                holdStartTime = -1;
+                shockStrength = 1.0; 
+                explosionBrightness = Math.max(40.0, explosionBrightness * 1.5); 
+
+                // --- 새로운 폭발 이펙트 트리거 (JS 트랜지션 사용) ---
+
+                // 1. 폭발 버스트 (image_1.png 사용)
+                burstEffect.style.left = lastHeldX + 'px';
+                burstEffect.style.top = lastHeldY + 'px';
+                burstEffect.style.transition = 'none'; // 이전 트랜지션 제거
+                burstEffect.style.width = '0vmin'; // 초기 크기
+                burstEffect.style.height = '0vmin';
+                burstEffect.style.opacity = '1';
+                burstEffect.style.transform = 'translate(-50%, -50%) scale(0)';
+                // 브라우저 렌더링을 위한 짤막한 지연
+                requestAnimationFrame(() => {
+                    burstEffect.style.transition = 'width 0.2s ease-out, height 0.2s ease-out, transform 0.2s ease-out, opacity 0.3s ease-in';
+                    burstEffect.style.width = 'var(--max-size)';
+                    burstEffect.style.height = 'var(--max-size)';
+                    burstEffect.style.transform = 'translate(-50%, -50%) scale(1)';
+                    burstEffect.style.opacity = '0'; // 동시에 페이드아웃
+                });
+
+                // 2. 공기 파장 (Shockwave/Refraction)
+                shockwaveEffect.style.left = lastHeldX + 'px';
+                shockwaveEffect.style.top = lastHeldY + 'px';
+                shockwaveEffect.style.transition = 'none'; // 이전 트랜지션 제거
+                shockwaveEffect.style.width = '0vmin'; // 초기 크기
+                shockwaveEffect.style.height = '0vmin';
+                shockwaveEffect.style.opacity = '1';
+                shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(0)';
+                // 브라우저 렌더링을 위한 짤막한 지연
+                requestAnimationFrame(() => {
+                    shockwaveEffect.style.transition = 'width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out, opacity 0.2s ease-in';
+                    shockwaveEffect.style.width = 'var(--max-size)';
+                    shockwaveEffect.style.height = 'var(--max-size)';
+                    shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(1)';
+                    shockwaveEffect.style.opacity = '0'; // 동시에 페이드아웃
+                });
             }
         }
 
@@ -325,35 +356,54 @@
             camera.position.y += (targetY - camera.position.y) * 0.005;
             camera.lookAt(scene.position);
 
-            let easing = isHolding ? 0.005 : 0.02; 
-            currentProgress += (targetProgress - currentProgress) * easing;
-            
-            rayEffect.style.width = `calc(var(--max-size) * ${currentProgress})`;
-            rayEffect.style.height = `calc(var(--max-size) * ${currentProgress})`;
-            
-            rayScale = currentProgress; 
-            rayOpacity = currentProgress; 
-
-            bgParticlesMaterial.uniforms.uGatherProgress.value = currentProgress;
-            bgParticlesMaterial.uniforms.uTime.value = time * 0.001; 
-
-            if (isBursting) {
-                burstTime += 0.016;
-                burstParticlesMaterial.uniforms.uBurstTime.value = burstTime;
-                
-                if (burstTime > 12.0) {
-                    isBursting = false;
-                    burstParticlesMaterial.visible = false;
+            meteors.forEach(meteor => {
+                meteor.position.add(meteor.userData.velocity);
+                if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
+                    resetMeteor(meteor);
                 }
-            }
-            
-            rayEffect.style.left = lastHeldX + 'px';
-            rayEffect.style.top = lastHeldY + 'px';
-            
-            if (rayScale > 0.01) {
-                rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
-                rayEffect.style.opacity = rayOpacity;
+            });
+
+            if (isHolding) {
+                if (holdStartTime < 0) holdStartTime = time;
+                
+                let holdDuration = (time - holdStartTime) / 1000.0;
+                let progress = Math.min(holdDuration / 10.0, 1.0); 
+
+                energyLevel = progress; 
+                gatherStrength = progress; 
+                shockStrength = 0.0; 
+                
+                waveScale = 0.1 + (progress * 1.5) + Math.sin(time * 0.002) * 0.05; 
+                waveOpacity = progress; 
+                
+                explosionBrightness = 2.0 + Math.pow(progress, 4.0) * 28.0; 
             } else {
+                gatherStrength *= 0.98; 
+                shockStrength *= 0.998; 
+                energyLevel *= 0.995;    
+                
+                waveScale += (60.0 - waveScale) * 0.002; 
+                waveOpacity *= 0.995; 
+                
+                explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
+            }
+
+            particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
+            particlesMaterial.uniforms.uShockStrength.value = shockStrength;
+            particlesMaterial.uniforms.uGatherStrength.value = gatherStrength;
+            particlesMaterial.uniforms.uTime.value = time * 0.001; 
+            
+            if(isHolding) {
+                rayEffect.style.left = lastHeldX + 'px';
+                rayEffect.style.top = lastHeldY + 'px';
+            }
+
+            if (isHolding || waveOpacity > 0.005) {
+                rayEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
+                rayEffect.style.opacity = waveOpacity;
+                rayEffect.style.filter = `blur(12px) brightness(${explosionBrightness})`; 
+            } else if (waveScale > 0) {
+                waveScale = 0;
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
