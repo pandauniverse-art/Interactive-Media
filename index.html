@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Lens Flare & Big Bang</title>
+    <title>Deep Space - 5s Charging & Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 1. 이펙트 컨테이너 */
         #waveEffect {
             position: fixed;
             width: 15vmin; 
@@ -20,36 +19,31 @@
             mix-blend-mode: screen; 
         }
 
-        /* 2. image_2.png의 날카로운 방사형 렌즈 플레어 구현 */
+        /* 렌즈 플레어 광선 레이어 */
         #waveEffect::before {
             content: '';
             position: absolute;
             top: -50%; left: -50%;
             width: 200%; height: 200%;
-            /* 날카롭고 수많은 방사형 광선들 구현 */
             background:
-                /* 주 광선 4개 (Teal) */
                 conic-gradient(from 15deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.8) 1%, rgba(200,230,255,0) 2.5%),
                 conic-gradient(from 75deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
                 conic-gradient(from 165deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.7) 1%, rgba(200,230,255,0) 2.5%),
                 conic-gradient(from 255deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
-                /* 얇고 수많은 방사형 광선들 (Cyan/Teal) */
                 repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.1) 0.5deg, rgba(200,230,255,0) 1.5deg),
                 repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.15) 1deg, rgba(200,230,255,0) 3deg);
             border-radius: 50%;
             mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
             -webkit-mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
-            /* 회전 애니메이션 유지 */
-            animation: spin 6s linear infinite;
+            animation: spin 3s linear infinite; /* 빨려들어가는 느낌을 위해 회전 속도 2배 증가 (6s -> 3s) */
         }
 
-        /* 3. 강력한 중심부 코어 강화 */
+        /* 중심부 코어 */
         #waveEffect::after {
             content: '';
             position: absolute;
             top: 35%; left: 35%;
             width: 30%; height: 30%;
-            /* 더 밝고 넓은 코어 */
             background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.9) 60%, transparent 90%);
             border-radius: 50%;
             box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.6);
@@ -69,11 +63,12 @@
         uniform float uTime;
         uniform float uEnergyLevel;
         uniform float uShockStrength;
+        uniform float uGatherStrength; // 새로 추가: 빨려 들어가는 힘
         uniform vec2 uExplosionCenter;
         attribute float aSize;
 
         varying float vAlpha;
-        varying float vShock; // Fragment Shader로 폭발 강도 전달
+        varying float vShock; 
 
         void main() {
             vec3 modPos = position;
@@ -83,17 +78,22 @@
             vec2 screenPos = (projectionMatrix * mvPosition).xy / (projectionMatrix * mvPosition).w;
             float dist = distance(uExplosionCenter, screenPos);
             
-            vAlpha = 0.2; // 기본 투명도
+            vAlpha = 0.2; 
 
-            // 응축 시 밝기 증폭
             float localEffect = exp(-dist * 5.0); 
             vAlpha += localEffect * uEnergyLevel * 3.0; 
 
-            // 빅뱅 웅장함 업그레이드: 밀어내는 힘(Force) 1500.0으로 대폭 상향
-            float pushForce = localEffect * uShockStrength * 1500.0; 
+            // 1. 빨려 들어가는 힘 (Gather) & 소용돌이 (Swirl) 계산
             vec2 direction = normalize(screenPos - uExplosionCenter);
+            vec2 swirl = vec2(-direction.y, direction.x); // 수직 방향 벡터로 회전 유도
             
-            vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * pushForce, pushForce * 0.1, 0.0));
+            float pullForce = localEffect * uGatherStrength * 250.0; 
+            float pushForce = localEffect * uShockStrength * 1500.0; 
+
+            // 폭발할 땐 밖으로(direction), 모일 땐 안으로(-direction) + 회전(swirl)
+            vec2 movement = direction * (pushForce - pullForce) + swirl * (pullForce * 0.8);
+            
+            vec4 finalPosition = projectionMatrix * (mvPosition + vec4(movement, (pushForce - pullForce) * 0.1, 0.0));
             gl_Position = finalPosition;
             gl_PointSize = aSize; 
             
@@ -109,12 +109,11 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 폭발 순간 파티클 색상 변화: 하얀색에서 청백색(Cyan/Blue) 거성 느낌으로 전환
             vec3 baseColor = vec3(1.0, 1.0, 1.0);
             vec3 explosionColor = vec3(0.5, 0.8, 1.0); 
             vec3 finalColor = mix(baseColor, explosionColor, vShock * 2.0);
             
-            gl_FragColor = vec4(finalColor, vAlpha + vShock); // 폭발 시 일시적으로 투명도 상승
+            gl_FragColor = vec4(finalColor, vAlpha + vShock); 
         }
     </script>
 
@@ -126,10 +125,12 @@
         
         let energyLevel = 0.0;    
         let shockStrength = 0.0;  
+        let gatherStrength = 0.0; // 모이는 힘 변수
         let waveOpacity = 0.0; 
         let waveScale = 0.0;
 
         let isHolding = false;
+        let holdStartTime = -1; // 누르기 시작한 시간 추적
         let lastHeldX = 0, lastHeldY = 0;
 
         const meteors = [];
@@ -160,11 +161,13 @@
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
+            // uGatherStrength 유니폼 추가
             particlesMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     uTime: { value: 0.0 },
                     uEnergyLevel: { value: 0.0 },     
                     uShockStrength: { value: 0.0 },   
+                    uGatherStrength: { value: 0.0 },  
                     uExplosionCenter: { value: new THREE.Vector2(0, 0) }
                 },
                 vertexShader: document.getElementById('vertexShader').textContent,
@@ -221,13 +224,11 @@
                 (Math.random() - 0.5) * 6000,
                 -4000 - Math.random() * 5000
             );
-            
             meteor.userData.velocity = new THREE.Vector3(
                 (Math.random() - 0.5) * 80, 
                 (Math.random() - 0.5) * 80 - 20, 
                 150 + Math.random() * 200 
             );
-            
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
@@ -261,14 +262,15 @@
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
+            holdStartTime = -1; // 애니메이션 루프에서 정확한 시작 시간 캡처를 위해 초기화
             lastHeldX = clientX;
             lastHeldY = clientY;
-            
             shockStrength = 0.0;   
         }
 
         function triggerHoldEnd() {
             isHolding = false; 
+            holdStartTime = -1;
             shockStrength = 1.0; // 손을 뗄 때 빅뱅 트리거
         }
 
@@ -302,25 +304,35 @@
             });
 
             if (isHolding) {
-                // 부드럽게 에너지가 차오르는 연출
-                energyLevel += (1.0 - energyLevel) * 0.1; 
+                // 첫 프레임에 시작 시간 기록
+                if (holdStartTime < 0) holdStartTime = time;
+                
+                // 1. 누른 시간 계산 (초 단위)
+                let holdDuration = (time - holdStartTime) / 1000.0;
+                
+                // 2. 5초에 도달할 때까지 0.0 -> 1.0으로 증가하는 진행률 (최대 1.0에서 고정)
+                let progress = Math.min(holdDuration / 5.0, 1.0); 
+
+                energyLevel = progress; 
+                gatherStrength = progress; // 시간이 지날수록 더 강하게 빨려 들어감
                 shockStrength = 0.0; 
                 
-                // 크기가 미세하게 맥박침
-                waveScale = 1.0 + Math.sin(time * 0.01) * 0.1; 
-                waveOpacity = 1.0; 
+                // 3. 렌즈 플레어 빛이 5초 동안 점점 거대해짐 (0.5에서 최대 3.0 스케일까지 성장)
+                // 여기에 불안정하게 맥동하는 사인파 추가
+                waveScale = 0.5 + (progress * 2.5) + Math.sin(time * 0.02) * 0.1; 
+                waveOpacity = 0.5 + (progress * 0.5); 
             } else {
-                // 손을 떼는 순간 웅장한 감쇄 효과 (감쇄 속도를 늦춰 거대한 느낌 강조)
+                gatherStrength *= 0.8; // 손을 떼면 빨아들이는 힘 즉시 해제
                 shockStrength *= 0.95;  
                 energyLevel *= 0.90;    
                 
-                // 광선 레이어가 화면 전체를 덮을 정도로 거대하게 팽창
                 waveScale += (60.0 - waveScale) * 0.05; 
                 waveOpacity *= 0.93; 
             }
 
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
             particlesMaterial.uniforms.uShockStrength.value = shockStrength;
+            particlesMaterial.uniforms.uGatherStrength.value = gatherStrength;
             particlesMaterial.uniforms.uTime.value = time * 0.001; 
             
             if(isHolding) {
@@ -331,9 +343,9 @@
             if (isHolding || waveOpacity > 0.005) {
                 waveEffect.style.transform = `translate(-50%, -50%) scale(${waveScale})`;
                 waveEffect.style.opacity = waveOpacity;
-            } else if (flashScale > 0) {
-                flashScale = 0;
-                flashEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+            } else if (waveScale > 0) {
+                waveScale = 0;
+                waveEffect.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
