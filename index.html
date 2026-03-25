@@ -2,9 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Interactive Cosmic Art</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
+        /* touch-action: none; 으로 모바일 기본 스크롤 및 확대/축소 방지 */
+        body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
     </style>
 </head>
@@ -12,24 +14,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         let scene, camera, renderer, particles;
-        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0; // 마우스/터치 목표 좌표
 
         init();
         animate();
 
         function init() {
-            // 1. 씬 및 카메라 설정
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-            camera.position.z = 500; // 카메라를 뒤로 뺌
+            camera.position.z = 500;
 
-            // 2. 우주 파티클 생성 (만 개)
             const geometry = new THREE.BufferGeometry();
             const vertices = [];
             for (let i = 0; i < 10000; i++) {
-                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // x
-                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // y
-                vertices.push(THREE.MathUtils.randFloatSpread(2000)); // z
+                vertices.push(THREE.MathUtils.randFloatSpread(2000));
+                vertices.push(THREE.MathUtils.randFloatSpread(2000));
+                vertices.push(THREE.MathUtils.randFloatSpread(2000));
             }
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
@@ -37,21 +37,36 @@
             particles = new THREE.Points(geometry, material);
             scene.add(particles);
 
-            // 3. 렌더러 설정
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // 4. 마우스 이벤트 리스너 등록
-            document.addEventListener('mousemove', onDocumentMouseMove);
+            // PC 마우스 이벤트
+            document.addEventListener('mousemove', onMouseMove);
+            
+            // 모바일 터치 이벤트 추가 (passive: false 설정으로 브라우저 기본 동작 제어)
+            document.addEventListener('touchstart', onTouchMove, { passive: false });
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            
             window.addEventListener('resize', onWindowResize);
         }
 
-        function onDocumentMouseMove(event) {
-            // 마우스 좌표를 화면 중앙 기준으로 -1 ~ 1 사이 값으로 정규화
-            mouseX = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
-            mouseY = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+        // 마우스 좌표 계산
+        function onMouseMove(event) {
+            targetX = ((event.clientX - window.innerWidth / 2) / (window.innerWidth / 2)) * 200;
+            targetY = -((event.clientY - window.innerHeight / 2) / (window.innerHeight / 2)) * 200;
+        }
+
+        // 터치 좌표 계산
+        function onTouchMove(event) {
+            // 터치 시 화면 스크롤 방지
+            event.preventDefault(); 
+            
+            if (event.touches.length > 0) {
+                targetX = ((event.touches[0].clientX - window.innerWidth / 2) / (window.innerWidth / 2)) * 200;
+                targetY = -((event.touches[0].clientY - window.innerHeight / 2) / (window.innerHeight / 2)) * 200;
+            }
         }
 
         function onWindowResize() {
@@ -63,17 +78,13 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // 5. 마우스 위치에 따라 카메라 위치 조정 (핵심 인터랙션)
-            // 완만한 움직임을 위해 목표값에 서서히 다가가도록 계산
-            const targetX = mouseX * 200; 
-            const targetY = -mouseY * 200; 
-
+            // 부드러운 카메라 이동 (보간법)
             camera.position.x += (targetX - camera.position.x) * 0.05;
             camera.position.y += (targetY - camera.position.y) * 0.05;
-            camera.lookAt(scene.position); // 항상 중앙을 바라봄
+            camera.lookAt(scene.position);
 
-            // 파티클 자체도 서서히 회전시킴
             particles.rotation.y += 0.001;
+            particles.rotation.x += 0.0005; // 약간의 입체감을 위해 x축 회전 추가
 
             renderer.render(scene, camera);
         }
