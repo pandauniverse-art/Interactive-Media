@@ -3,22 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Crisp Wavelength</title>
+    <title>Deep Space - Crisp Wavelength with Ray Glow</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 뿌옇게 만드는 그라데이션/블러를 완전히 삭제하고 선명한 테두리(Border)만 남김 */
+        /* 딱딱한 선(Border) 대신, 클릭 지점 주변만 빛이 퍼지는 레이(Ray) 블러 효과 적용 */
         #waveEffect {
             position: fixed;
-            width: 10vmin; 
-            height: 10vmin;
-            border: 2px solid rgba(255, 255, 255, 1); /* 아주 선명하고 얇은 흰색 선 */
+            width: 12vmin; 
+            height: 12vmin;
+            /* 중심부는 완전한 흰색으로 선명하게, 바깥은 투명해지는 광원 효과 */
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,225,255,0.8) 30%, rgba(255,255,255,0) 70%);
+            /* 클릭 주위부만 살짝 블러 처리되어 빛이 뿜어져 나오는 느낌(Glow) 추가 */
+            box-shadow: 0 0 40px 15px rgba(255, 255, 255, 0.4);
             border-radius: 50%;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
+            mix-blend-mode: screen; /* 배경 별들과 자연스럽게 빛이 섞이도록 설정 */
         }
     </style>
 </head>
@@ -47,17 +51,17 @@
             // 1. 아무것도 안 할 때는 전체 별 투명도 20% (0.2) 고정
             vAlpha = 0.2;
 
-            // 2. 전체 색상이 변하는 문제 해결: 마우스 중심부 근처만 밝아지도록 국소화
+            // 2. 마우스 중심부 파티클 밝기 3배 증폭 (0.8 -> 2.4)
             float localEffect = exp(-dist * 5.0); 
-            vAlpha += localEffect * uEnergyLevel * 0.8; // 마우스 근처만 최대 1.0(100%)까지 선명해짐
+            vAlpha += localEffect * uEnergyLevel * 2.4; 
 
-            // 3. 파티클 크기 팽창 삭제 (블러/뭉개짐 원인 제거)
+            // 3. 파티클 크기 팽창 없이 위치만 밀어냄 (뭉개짐 방지)
             float pushForce = localEffect * uShockStrength * 400.0; 
             vec2 direction = normalize(screenPos - uExplosionCenter);
             
             vec4 finalPosition = projectionMatrix * (mvPosition + vec4(direction * pushForce, pushForce * 0.1, 0.0));
             gl_Position = finalPosition;
-            gl_PointSize = aSize; // 크기를 그대로 유지하여 픽셀의 선명함 보장
+            gl_PointSize = aSize; 
         }
     </script>
 
@@ -68,7 +72,6 @@
             float dist = distance(gl_PointCoord, vec2(0.5));
             if (dist > 0.5) discard;
             
-            // 4. 불필요한 색상 믹스 삭제. 오직 깨끗한 흰색 픽셀로만 렌더링
             gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
         }
     </script>
@@ -225,7 +228,7 @@
 
         function triggerHoldEnd() {
             isHolding = false; 
-            shockStrength = 1.0; // 손 뗄 때만 파티클 밀어냄
+            shockStrength = 1.0; 
         }
 
         function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
@@ -257,16 +260,14 @@
                 }
             });
 
-            // 누르고 있을 때: 선명한 링(Ring) 파장 일렁임
             if (isHolding) {
                 energyLevel = 1.0; 
                 shockStrength = 0.0; 
                 
-                // 크기와 투명도가 맥박처럼 뛰는 파장
-                waveScale = 3.0 + Math.sin(time * 0.01) * 0.5; 
-                waveOpacity = 0.5 + Math.sin(time * 0.015) * 0.5; 
+                // 빛이 모이는 듯한 역동적인 크기/투명도 진동
+                waveScale = 2.0 + Math.sin(time * 0.01) * 0.3; 
+                waveOpacity = 0.8 + Math.sin(time * 0.015) * 0.2; 
             } else {
-                // 손을 뗄 때: 선명한 링이 크게 팽창하며 사라짐
                 shockStrength *= 0.96;  
                 energyLevel *= 0.95;    
                 
