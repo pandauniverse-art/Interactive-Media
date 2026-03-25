@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Meteor Shower & Ultimate Burst</title>
+    <title>Deep Space - 20% Speed Meteor Shower & Ultimate Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -186,7 +186,7 @@
         const BG_PARTICLE_COUNT = 160000; 
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
-        const meteors = []; // 유성 배열 유지
+        const meteors = [];
 
         init();
         animate();
@@ -264,7 +264,6 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
-            // 1. 유성우 개수를 300개로 대폭 증가
             createMeteors(300);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -288,7 +287,7 @@
             const meteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffffff, 
                 transparent: true, 
-                opacity: 0.5, // 투명도를 살짝 높임
+                opacity: 0.5, 
                 blending: THREE.AdditiveBlending,
                 depthTest: false
             });
@@ -302,17 +301,17 @@
         }
 
         function resetMeteor(meteor) {
-            // 2. 화면 중앙부(카메라 시야)에 집중적으로 생성되도록 범위 축소
             meteor.position.set(
                 (Math.random() - 0.5) * 6000, 
                 (Math.random() - 0.5) * 4000, 
                 -2000 - Math.random() * 4000 
             );
-            // 3. 유성이 화면을 가로지르는 속도 대폭 상향
+            
+            // 1. 유성 속도를 기존(100%) 대비 20% 수준으로 대폭 감속
             meteor.userData.velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 12, 
-                (Math.random() - 0.5) * 12 - 2, 
-                40 + Math.random() * 40 
+                (Math.random() - 0.5) * 2.4,   // 기존 12 -> 2.4
+                (Math.random() - 0.5) * 2.4 - 0.4, // 기존 12, -2 -> 2.4, -0.4
+                8 + Math.random() * 8          // 기존 40 ~ 80 -> 8 ~ 16
             );
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
@@ -415,10 +414,8 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // 유성우 애니메이션 업데이트 루프 추가
             meteors.forEach(meteor => {
                 meteor.position.add(meteor.userData.velocity);
-                // 화면 밖으로 나갔거나 카메라를 완전히 통과했을 때 초기화
                 if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
                     resetMeteor(meteor);
                 }
