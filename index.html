@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Overcharge & Kamehameha</title>
+    <title>Deep Space - Blinding White-out & Blazing Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -12,16 +12,23 @@
             position: fixed;
             width: 20vmin; 
             height: 20vmin;
+            /* **중심점 일치 FIX**: transform translate(-50%, -50%)를 유지하여 
+               빛의 중앙이 정확히 마우스 포인터 픽셀 위치와 겹치도록 보장 */
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.8) 15%, rgba(100,180,255,0.4) 40%, transparent 70%);
-            box-shadow: 0 0 100px 40px rgba(100, 200, 255, 0.4), 0 0 200px 80px rgba(255, 255, 255, 0.2);
+            
+            /* 1. 중심부 화이트아웃 디자인: radial-gradient의 중앙 비율을 넓게 조정 */
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,1) 40%, rgba(100,180,255,0.4) 60%, transparent 80%);
+            
+            /* 2. 밝기 극한 증폭: box-shadow를 더 거대하고 선명하게 */
+            box-shadow: 0 0 150px 70px rgba(100, 200, 255, 0.6), 0 0 300px 150px rgba(255, 255, 255, 0.4);
             border-radius: 50%;
+            
+            /* 기본 블러 및 초기 밝기 */
             filter: blur(12px) brightness(2.0); 
-            /* 밝기 폭증을 더 드라마틱하게 보여주기 위해 transition 제거 (자바스크립트가 직접 프레임 제어) */
         }
     </style>
 </head>
@@ -53,6 +60,7 @@
             float mvDist = length(mvDirToCenter);
             vec2 mvDirNorm = mvDist > 0.001 ? (mvDirToCenter / mvDist) : vec2(0.0);
 
+            // 속도 30% 감속 유지
             float phase = fract(uTime * 0.13 + aSize * 15.0); 
             vGatherPhase = phase * uGatherStrength; 
 
@@ -74,10 +82,10 @@
             gl_Position = projectionMatrix * mvPosition;
             gl_PointSize = aSize; 
             
-            // 1. 임계점 도달 시 파티클의 밝기를 25.0까지 폭발적으로 증가시켜 중심부를 하얗게 날려버림
-            vAlpha = 0.36 + (localEffect * uEnergyLevel * 25.0); 
+            // 3. 파티클 밝기 극한 증폭: 계수를 25.0에서 60.0으로 대폭 상향하여 중심부를 완전히 날려버림
+            vAlpha = 0.36 + (localEffect * uEnergyLevel * 60.0); 
             
-            // 폭발 시 셰이더 내부 밝기 3배 유지
+            // 폭발 시 셰이더 내부 밝기 유지
             vShock = uShockStrength * localEffect * 3.0;
         }
     </script>
@@ -118,7 +126,7 @@
 
         let isHolding = false;
         let holdStartTime = -1; 
-        let lastHeldX = 0, lastHeldY = 0;
+        let lastHeldX = 0, lastHeldY = 0; // 마우스 픽셀 좌표 정확히 캡처
 
         const meteors = [];
         const PARTICLE_COUNT = 125000;
@@ -210,6 +218,7 @@
                 (Math.random() - 0.5) * 6000,
                 -4000 - Math.random() * 5000
             );
+            // 유성우 속도도 저속 유지
             meteor.userData.velocity = new THREE.Vector3(
                 (Math.random() - 0.5) * 8, 
                 (Math.random() - 0.5) * 8 - 2, 
@@ -222,6 +231,7 @@
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
             mouseY = -(clientY - window.innerHeight / 2) / (window.innerHeight / 2);
             
+            // 왜곡 최소화 유지
             targetX = mouseX * 80; 
             targetY = mouseY * 80;
             
@@ -231,6 +241,7 @@
         function onMouseMove(event) { 
             updateExplosionCenter(event.clientX, event.clientY); 
             if(isHolding) { 
+                // **중심점 일치 FIX**: 마우스의 픽셀 좌표를 정확히 캡처
                 lastHeldX = event.clientX;
                 lastHeldY = event.clientY;
             }
@@ -260,8 +271,8 @@
                 holdStartTime = -1;
                 shockStrength = 1.0; 
                 
-                // 3. 폭발 순간 밝기를 최소 40.0으로 펌핑하여 압도적인 화이트 플래시 구현
-                explosionBrightness = Math.max(40.0, explosionBrightness * 1.5); 
+                // 4. 폭발 순간 밝기 극한 펌핑: 최소 120.0으로 상향하여 압도적인 화이트 플래시 구현
+                explosionBrightness = Math.max(120.0, explosionBrightness * 1.5); 
             }
         }
 
@@ -307,10 +318,11 @@
                 waveScale = 0.1 + (progress * 1.5) + Math.sin(time * 0.002) * 0.05; 
                 waveOpacity = progress; 
                 
-                // 2. 밝기 폭증 로직: Math.pow()를 사용하여 8초~10초 구간에서 밝기가 수직 상승(Max 30.0)
-                // 이를 통해 에너지가 모이다가 끝내 중심부 디테일이 완전히 타버리는(White-out) 연출 완성
-                explosionBrightness = 2.0 + Math.pow(progress, 4.0) * 28.0; 
+                // 5. 밝기 기하급수적 폭증: 지수함수를 사용하여 8~10초 구간에서 밝기가 수직 상승(Max 80.0)
+                // 여기에 도달하면 중심부 디테일이 완전히 타버려 '화이트아웃' 연출 완성
+                explosionBrightness = 2.0 + Math.pow(progress, 5.0) * 78.0; 
             } else {
+                // 속도 30% 감속 유지
                 gatherStrength *= 0.98; 
                 shockStrength *= 0.998; 
                 energyLevel *= 0.995;    
@@ -328,6 +340,8 @@
             particlesMaterial.uniforms.uTime.value = time * 0.001; 
             
             if(isHolding) {
+                // **중심점 일치 FIX**: 캡처한 마우스 픽셀 좌표를 CSS 스타일에 직접 매핑
+                // transform: translate(-50%, -50%) 속성과 함께 작동하여 정확한 중심 정렬 보장
                 waveEffect.style.left = lastHeldX + 'px';
                 waveEffect.style.top = lastHeldY + 'px';
             }
