@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Synced Shockwave & Burst</title>
+    <title>Deep Space - 10% Speed Shockwave</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -316,7 +316,6 @@
                     burstParticlesMaterial.visible = true;
                     burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
-                    // 화염 이미지 폭발 트리거 (파티클 속도에 맞춰 0.8초로 연장)
                     burstEffect.style.left = lastHeldX + 'px';
                     burstEffect.style.top = lastHeldY + 'px';
                     burstEffect.style.transition = 'none';
@@ -333,7 +332,7 @@
                         burstEffect.style.opacity = '0'; 
                     });
 
-                    // 공기 파장(Shockwave) 트리거 (파티클 확산 속도에 맞춰 1.5초로 대폭 연장)
+                    // 1. 공기 파장(Shockwave) 확산 속도를 기존 1.5초에서 15.0초로 10배 감속 (10% 속도)
                     shockwaveEffect.style.left = lastHeldX + 'px';
                     shockwaveEffect.style.top = lastHeldY + 'px';
                     shockwaveEffect.style.transition = 'none';
@@ -343,7 +342,7 @@
                     shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(0)';
                     
                     requestAnimationFrame(() => {
-                        shockwaveEffect.style.transition = 'width 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), height 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), transform 1.5s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 1.5s ease-out';
+                        shockwaveEffect.style.transition = 'width 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), height 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), transform 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 15.0s ease-out';
                         shockwaveEffect.style.width = 'var(--max-size)';
                         shockwaveEffect.style.height = 'var(--max-size)';
                         shockwaveEffect.style.transform = 'translate(-50%, -50%) scale(1)';
