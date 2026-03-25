@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 5s Charging & Big Bang</title>
+    <title>Deep Space - Epic Charging & Big Bang</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -17,41 +17,51 @@
             pointer-events: none;
             z-index: 100;
             mix-blend-mode: screen; 
+            /* 1. 전체 밝기 200% 증폭 및 코어 발광 추가 */
+            filter: brightness(2.0);
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,220,255,0.8) 25%, transparent 60%);
+            box-shadow: 0 0 60px 20px rgba(100, 200, 255, 0.6), 0 0 120px 40px rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
         }
 
-        /* 렌즈 플레어 광선 레이어 */
+        /* 2. 메인 광선 레이어 (정방향 회전, 속도 50% 감소) */
         #waveEffect::before {
             content: '';
             position: absolute;
             top: -50%; left: -50%;
             width: 200%; height: 200%;
             background:
-                conic-gradient(from 15deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.8) 1%, rgba(200,230,255,0) 2.5%),
-                conic-gradient(from 75deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
-                conic-gradient(from 165deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.7) 1%, rgba(200,230,255,0) 2.5%),
-                conic-gradient(from 255deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.6) 1%, rgba(200,230,255,0) 2.5%),
-                repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.1) 0.5deg, rgba(200,230,255,0) 1.5deg),
-                repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.15) 1deg, rgba(200,230,255,0) 3deg);
+                conic-gradient(from 15deg, rgba(200,230,255,0) 0%, rgba(200,230,255,1) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 105deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.8) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 195deg, rgba(200,230,255,0) 0%, rgba(200,230,255,1) 1%, rgba(200,230,255,0) 2.5%),
+                conic-gradient(from 285deg, rgba(200,230,255,0) 0%, rgba(200,230,255,0.8) 1%, rgba(200,230,255,0) 2.5%),
+                repeating-conic-gradient(from 0deg, rgba(200,230,255,0) 0deg, rgba(200,230,255,0.2) 0.5deg, rgba(200,230,255,0) 1.5deg);
             border-radius: 50%;
-            mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
-            -webkit-mask-image: radial-gradient(circle, transparent 10%, black 30%, transparent 65%);
-            animation: spin 3s linear infinite; /* 빨려들어가는 느낌을 위해 회전 속도 2배 증가 (6s -> 3s) */
+            mask-image: radial-gradient(circle, transparent 5%, black 25%, transparent 65%);
+            -webkit-mask-image: radial-gradient(circle, transparent 5%, black 25%, transparent 65%);
+            animation: spin 6s linear infinite; /* 3초에서 6초로 느려짐 */
         }
 
-        /* 중심부 코어 */
+        /* 3. 서브 광선 레이어 (역방향 회전 추가로 화려함 대폭 상향) */
         #waveEffect::after {
             content: '';
             position: absolute;
-            top: 35%; left: 35%;
-            width: 30%; height: 30%;
-            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,230,255,0.9) 60%, transparent 90%);
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background:
+                conic-gradient(from 45deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.7) 1%, rgba(150,255,255,0) 2%),
+                conic-gradient(from 135deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.5) 1%, rgba(150,255,255,0) 2%),
+                conic-gradient(from 225deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.7) 1%, rgba(150,255,255,0) 2%),
+                conic-gradient(from 315deg, rgba(150,255,255,0) 0%, rgba(150,255,255,0.5) 1%, rgba(150,255,255,0) 2%),
+                repeating-conic-gradient(from 0deg, rgba(200,255,255,0) 0deg, rgba(200,255,255,0.1) 1deg, rgba(200,255,255,0) 2.5deg);
             border-radius: 50%;
-            box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.6);
+            mask-image: radial-gradient(circle, transparent 15%, black 40%, transparent 60%);
+            -webkit-mask-image: radial-gradient(circle, transparent 15%, black 40%, transparent 60%);
+            animation: spin-reverse 8s linear infinite; /* 반대로 천천히 회전 */
         }
 
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
     </style>
 </head>
 <body>
@@ -63,7 +73,7 @@
         uniform float uTime;
         uniform float uEnergyLevel;
         uniform float uShockStrength;
-        uniform float uGatherStrength; // 새로 추가: 빨려 들어가는 힘
+        uniform float uGatherStrength; 
         uniform vec2 uExplosionCenter;
         attribute float aSize;
 
@@ -80,17 +90,16 @@
             
             vAlpha = 0.2; 
 
+            // 파티클 밝기 대폭 증폭 (3.0 -> 6.0)
             float localEffect = exp(-dist * 5.0); 
-            vAlpha += localEffect * uEnergyLevel * 3.0; 
+            vAlpha += localEffect * uEnergyLevel * 6.0; 
 
-            // 1. 빨려 들어가는 힘 (Gather) & 소용돌이 (Swirl) 계산
             vec2 direction = normalize(screenPos - uExplosionCenter);
-            vec2 swirl = vec2(-direction.y, direction.x); // 수직 방향 벡터로 회전 유도
+            vec2 swirl = vec2(-direction.y, direction.x); 
             
             float pullForce = localEffect * uGatherStrength * 250.0; 
             float pushForce = localEffect * uShockStrength * 1500.0; 
 
-            // 폭발할 땐 밖으로(direction), 모일 땐 안으로(-direction) + 회전(swirl)
             vec2 movement = direction * (pushForce - pullForce) + swirl * (pullForce * 0.8);
             
             vec4 finalPosition = projectionMatrix * (mvPosition + vec4(movement, (pushForce - pullForce) * 0.1, 0.0));
@@ -110,7 +119,7 @@
             if (dist > 0.5) discard;
             
             vec3 baseColor = vec3(1.0, 1.0, 1.0);
-            vec3 explosionColor = vec3(0.5, 0.8, 1.0); 
+            vec3 explosionColor = vec3(0.3, 0.9, 1.0); // 더 강렬한 Cyan/Blue 색상
             vec3 finalColor = mix(baseColor, explosionColor, vShock * 2.0);
             
             gl_FragColor = vec4(finalColor, vAlpha + vShock); 
@@ -125,12 +134,12 @@
         
         let energyLevel = 0.0;    
         let shockStrength = 0.0;  
-        let gatherStrength = 0.0; // 모이는 힘 변수
+        let gatherStrength = 0.0; 
         let waveOpacity = 0.0; 
         let waveScale = 0.0;
 
         let isHolding = false;
-        let holdStartTime = -1; // 누르기 시작한 시간 추적
+        let holdStartTime = -1; 
         let lastHeldX = 0, lastHeldY = 0;
 
         const meteors = [];
@@ -161,7 +170,6 @@
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
-            // uGatherStrength 유니폼 추가
             particlesMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     uTime: { value: 0.0 },
@@ -262,7 +270,7 @@
 
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
-            holdStartTime = -1; // 애니메이션 루프에서 정확한 시작 시간 캡처를 위해 초기화
+            holdStartTime = -1; 
             lastHeldX = clientX;
             lastHeldY = clientY;
             shockStrength = 0.0;   
@@ -271,7 +279,7 @@
         function triggerHoldEnd() {
             isHolding = false; 
             holdStartTime = -1;
-            shockStrength = 1.0; // 손을 뗄 때 빅뱅 트리거
+            shockStrength = 1.0; 
         }
 
         function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
@@ -304,30 +312,26 @@
             });
 
             if (isHolding) {
-                // 첫 프레임에 시작 시간 기록
                 if (holdStartTime < 0) holdStartTime = time;
                 
-                // 1. 누른 시간 계산 (초 단위)
                 let holdDuration = (time - holdStartTime) / 1000.0;
-                
-                // 2. 5초에 도달할 때까지 0.0 -> 1.0으로 증가하는 진행률 (최대 1.0에서 고정)
                 let progress = Math.min(holdDuration / 5.0, 1.0); 
 
                 energyLevel = progress; 
-                gatherStrength = progress; // 시간이 지날수록 더 강하게 빨려 들어감
+                gatherStrength = progress; 
                 shockStrength = 0.0; 
                 
-                // 3. 렌즈 플레어 빛이 5초 동안 점점 거대해짐 (0.5에서 최대 3.0 스케일까지 성장)
-                // 여기에 불안정하게 맥동하는 사인파 추가
                 waveScale = 0.5 + (progress * 2.5) + Math.sin(time * 0.02) * 0.1; 
                 waveOpacity = 0.5 + (progress * 0.5); 
             } else {
-                gatherStrength *= 0.8; // 손을 떼면 빨아들이는 힘 즉시 해제
-                shockStrength *= 0.95;  
-                energyLevel *= 0.90;    
+                // 4. 속도 50% 감소: 팽창 및 페이드아웃을 훨씬 천천히 진행 (웅장함 강조)
+                gatherStrength *= 0.9; 
+                shockStrength *= 0.975; // 기존 0.95에서 수치 조정으로 감쇄 속도 저하
+                energyLevel *= 0.95;    // 기존 0.90에서 수치 조정
                 
-                waveScale += (60.0 - waveScale) * 0.05; 
-                waveOpacity *= 0.93; 
+                // 빛무리가 화면 전체를 천천히 삼키도록 목표 스케일 상향(100.0) 및 속도 저하(0.025)
+                waveScale += (100.0 - waveScale) * 0.025; 
+                waveOpacity *= 0.965; // 기존 0.93에서 페이드아웃 속도 저하
             }
 
             particlesMaterial.uniforms.uEnergyLevel.value = energyLevel;
