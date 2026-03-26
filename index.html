@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Smooth Charge & Drawing Burst</title>
+    <title>Deep Space - Sharp Charge & Massive 900 Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -270,10 +270,11 @@
 
             createMeteors(300);
             
-            // 목표: 300개의 차징 유성
-            createChargingMeteors(300);
+            // 차징 유성(안으로 모임)
+            createChargingMeteors(400);
 
-            createBurstMeteors(300);
+            // 1. 튕겨나가는 폭발 유성 개수를 3배인 900개로 상향
+            createBurstMeteors(900);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -322,28 +323,32 @@
         }
 
         function createChargingMeteors(count) {
-            const geom = new THREE.CylinderGeometry(4, 0.5, 1500, 3); 
+            // 2. 모여드는 선(차징 유성)의 두께를 기존(4, 0.5)의 20% 수준인 (0.8, 0.1)로 대폭 얇게 조절
+            const geom = new THREE.CylinderGeometry(0.8, 0.1, 1500, 3); 
             geom.rotateX(Math.PI / 2); 
             
             for(let i = 0; i < count; i++) {
-                // 핵심 픽스 1: 팝업 버그 해결을 위해 모든 차징 유성이 '각자 독립적인 재질'을 갖게 함
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, // 가시성 극대화를 위해 순백색 적용
+                    color: 0xffffff, 
                     transparent: true, 
                     opacity: 0.0, 
                     blending: THREE.AdditiveBlending,
                     depthTest: false
                 });
-                const meteor = new THREE.Mesh(geom, mat);
+                const meteor = new MeshWithData(geom, mat);
                 meteor.userData.active = false;
                 scene.add(meteor);
                 chargingMeteors.push(meteor);
             }
         }
 
+        function MeshWithData(geom, mat) {
+            return new THREE.Mesh(geom, mat);
+        }
+
         function resetChargingMeteor(meteor, targetPos) {
             const theta = Math.random() * Math.PI * 2;
-            const radius = 3500 + Math.random() * 2000; // 충분히 밖에서부터
+            const radius = 3500 + Math.random() * 2000; 
             const zDist = (Math.random() - 0.5) * 4000;
 
             meteor.position.set(
@@ -356,15 +361,13 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             
             meteor.userData.direction = dir;
-            meteor.userData.speed = 40 + Math.random() * 60; // 50% 수준으로 모이는 속도 감속
+            meteor.userData.speed = 40 + Math.random() * 60; 
         }
 
         function createBurstMeteors(count) {
             const geom = new THREE.CylinderGeometry(2, 0.2, 1200, 3);
             geom.rotateX(Math.PI / 2); 
-            
-            // 핵심 픽스 2: 선 긋기 연출을 위해 3D 모델의 중심축(Origin)을 정가운데에서 꼬리(Tail) 끝으로 이동
-            geom.translate(0, 0, 600);
+            geom.translate(0, 0, 600); // 꼬리를 원점으로 (선 긋기 효과)
             
             burstMeteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffddaa, 
@@ -376,7 +379,7 @@
 
             for(let i = 0; i < count; i++) {
                 const meteor = new THREE.Mesh(geom, burstMeteorMaterial);
-                meteor.scale.z = 0.001; // 처음엔 길이가 0 (안 보임)
+                meteor.scale.z = 0.001; 
                 scene.add(meteor);
                 burstMeteors.push(meteor);
             }
@@ -471,17 +474,14 @@
                     burstMeteorMaterial.opacity = 1.0; 
 
                     burstMeteors.forEach(meteor => {
-                        // 폭발 순간, 모두 마우스 좌표 정중앙에 위치 (꼬리가 중앙에 놓임)
                         meteor.position.copy(burstTarget3D);
-                        // 길이가 0인 상태에서 시작하여, 애니메이션 프레임에서 점차 선을 그리며 길어짐
-                        meteor.scale.set(1, 1, 0.001); 
+                        meteor.scale.set(1, 1, 0.001); // 선 긋기를 위해 길이 0으로 초기화
                         
                         const u = Math.random();
                         const v = Math.random();
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
                         
-                        // 폭발 속도 10% 감속 적용 (기존 기준 150~400에서 -> 15~40으로)
                         const speed = 15 + Math.random() * 25; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
@@ -524,20 +524,20 @@
 
             const mouseTarget3D = getMouse3DTarget();
             
-            // 50개에서 300개로 기하급수적으로 밀도 컨트롤
-            const activeChargingLimit = Math.floor(50 + (250 * currentProgress));
+            const activeChargingLimit = Math.floor(50 + (350 * currentProgress));
 
             chargingMeteors.forEach((meteor, index) => {
                 if (isHolding && index < activeChargingLimit) {
                     if (!meteor.userData.active) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
-                        meteor.material.opacity = 0; // 나타날 땐 0부터 스무스하게
+                        // 3. 나타날 때 투명도 20%(0.2)로 시작
+                        meteor.material.opacity = 0.2; 
                     }
                     
-                    // 각자 독립된 재질을 가지고 있으므로, 개별적으로 자연스럽게 페이드인 (팝업 현상 완벽 방지)
+                    // 4. 서서히 투명도 100%(1.0)까지 부드럽게 상승
                     if(meteor.material.opacity < 1.0) {
-                        meteor.material.opacity = Math.min(1.0, meteor.material.opacity + 0.05);
+                        meteor.material.opacity = Math.min(1.0, meteor.material.opacity + 0.02);
                     }
 
                     const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
@@ -559,7 +559,6 @@
                 if (burstTime < 6.0) {
                     burstMeteorMaterial.opacity = 1.0 - (burstTime / 6.0);
                     burstMeteors.forEach(meteor => {
-                        // 선 긋기 연출: 길이가 점점 100%(1.0)를 향해 쭉 늘어남
                         meteor.scale.z = Math.min(1.0, meteor.scale.z + 0.1); 
                         meteor.position.add(meteor.userData.velocity);
                     });
