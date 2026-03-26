@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Overlapping Multi-Burst & Object Pool</title>
+    <title>Deep Space - Double Shockwave Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -59,7 +59,6 @@
             100% { transform: translate(-50%, -50%) rotate(-360deg); } 
         }
 
-        /* 다중 폭발을 위해 ID 대신 Class로 변경 */
         .burst-effect {
             position: fixed;
             width: 0vmin; 
@@ -77,6 +76,7 @@
             filter: brightness(2.0); 
         }
 
+        /* 1. 메인 충격파 (묵직하고 느림) */
         .shockwave-effect {
             position: fixed;
             width: 0vmin;
@@ -92,6 +92,23 @@
             background: radial-gradient(circle, transparent 70%, rgba(255, 255, 255, 0.1) 80%, transparent 90%);
             box-shadow: 0 0 100px 20px rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(6px) brightness(1.2); 
+        }
+
+        /* 2. 빠른 충격파 (얇고 날카로우며 빠름) */
+        .fast-shockwave-effect {
+            position: fixed;
+            width: 0vmin;
+            height: 0vmin;
+            --max-size: 150vmin; 
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 104; 
+            mix-blend-mode: overlay; 
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.6); /* 더 얇고 밝은 테두리 */
+            box-shadow: 0 0 50px 10px rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(2px) brightness(1.4); /* 덜 뭉개지는 굴절 */
         }
     </style>
 </head>
@@ -198,15 +215,13 @@
         let mouseGlow; 
 
         const BG_PARTICLE_COUNT = 160000; 
-        // 렌더링 부하를 막기 위해 중첩당 미세 파티클 개수는 8만개로 최적화
         const BURST_PARTICLE_COUNT = 80000; 
         const SPACE_RANGE = 10000;
         
         const meteors = [];         
         const chargingMeteors = []; 
         
-        // --- 1. 오브젝트 풀링 (다중 폭발 시스템) 설정 ---
-        const MAX_BURSTS = 3; // 화면에 동시에 겹칠 수 있는 최대 폭발 개수
+        const MAX_BURSTS = 3; 
         const burstPool = [];
         let currentBurstIndex = 0;
 
@@ -236,7 +251,6 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
 
-            // 배경 파티클
             const bgGeom = new THREE.BufferGeometry();
             const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
             const bgSizes = new Float32Array(BG_PARTICLE_COUNT);
@@ -268,12 +282,10 @@
             createMeteors(300);
             createChargingMeteors(400);
 
-            // --- 2. 폭발 인스턴스 풀 생성 ---
             for(let i = 0; i < MAX_BURSTS; i++) {
                 createBurstInstance();
             }
 
-            // 마우스 산란 이펙트
             const glowTex = createGlowTexture();
             const glowMat = new THREE.SpriteMaterial({ 
                 map: glowTex, 
@@ -300,9 +312,7 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        // --- 독립된 하나의 폭발 세트를 생성하는 함수 ---
         function createBurstInstance() {
-            // 1. HTML DOM 요소 동적 생성
             const burstDiv = document.createElement('div');
             burstDiv.className = 'burst-effect';
             document.body.appendChild(burstDiv);
@@ -311,7 +321,11 @@
             shockwaveDiv.className = 'shockwave-effect';
             document.body.appendChild(shockwaveDiv);
 
-            // 2. 미세 파티클 (80k)
+            // 두 번째 빠른 충격파 DOM 요소 생성
+            const fastShockwaveDiv = document.createElement('div');
+            fastShockwaveDiv.className = 'fast-shockwave-effect';
+            document.body.appendChild(fastShockwaveDiv);
+
             const burstGeom = new THREE.BufferGeometry();
             const burstPos = new Float32Array(BURST_PARTICLE_COUNT * 3);
             const burstVel = new Float32Array(BURST_PARTICLE_COUNT * 3);
@@ -333,7 +347,6 @@
             burstGeom.setAttribute('aVelocity', new THREE.BufferAttribute(burstVel, 3));
             burstGeom.setAttribute('aSize', new THREE.BufferAttribute(burstSizes, 1));
 
-            // 인스턴스별 독립된 쉐이더 재질
             const particlesMat = new THREE.ShaderMaterial({
                 uniforms: {
                     uBurstTime: { value: 0.0 },
@@ -349,7 +362,6 @@
             const particlesMesh = new THREE.Points(burstGeom, particlesMat);
             scene.add(particlesMesh);
 
-            // 3. 폭발 궤적 유성 (인스턴스당 1500개)
             const meteorGeom = new THREE.CylinderGeometry(2, 0.2, 1200, 3);
             meteorGeom.rotateX(Math.PI / 2); 
             meteorGeom.translate(0, 0, 600); 
@@ -370,12 +382,12 @@
                 meteorsArr.push(meteor);
             }
 
-            // 풀 배열에 저장
             burstPool.push({
                 active: false,
                 time: 0.0,
                 burstDiv: burstDiv,
                 shockwaveDiv: shockwaveDiv,
+                fastShockwaveDiv: fastShockwaveDiv, // 빠른 충격파 풀에 저장
                 particlesMat: particlesMat,
                 particlesMesh: particlesMesh,
                 meteorMat: meteorMat,
@@ -466,10 +478,7 @@
                 if(currentProgress > 0.1) {
                     explosionBrightness = Math.max(240.0, explosionBrightness * 2.0); 
 
-                    // --- 3. 현재 턴의 폭발 인스턴스를 가져와 실행 ---
                     const burst = burstPool[currentBurstIndex];
-                    
-                    // 다음 클릭을 위해 인덱스 순환
                     currentBurstIndex = (currentBurstIndex + 1) % MAX_BURSTS; 
 
                     burst.active = true;
@@ -478,30 +487,50 @@
                     burst.particlesMesh.visible = true;
                     burst.particlesMat.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
-                    // CSS 트랜지션을 강제로 끊고 재시작하기 위한 리플로우(Reflow) 작업
+                    // 화염 이미지
                     burst.burstDiv.style.transition = 'none';
                     burst.burstDiv.style.transform = 'translate(-50%, -50%) scale(0)';
                     burst.burstDiv.style.opacity = '1';
                     burst.burstDiv.style.left = lastHeldX + 'px';
                     burst.burstDiv.style.top = lastHeldY + 'px';
-                    void burst.burstDiv.offsetWidth; // Force reflow (핵심)
+                    void burst.burstDiv.offsetWidth; 
                     burst.burstDiv.style.transition = 'width 0.8s ease-out, height 0.8s ease-out, transform 0.8s ease-out, opacity 0.8s ease-in';
                     burst.burstDiv.style.width = 'var(--max-size)';
                     burst.burstDiv.style.height = 'var(--max-size)';
                     burst.burstDiv.style.transform = 'translate(-50%, -50%) scale(1)';
                     burst.burstDiv.style.opacity = '0'; 
 
+                    // 기존 메인 충격파 (느린 15초)
                     burst.shockwaveDiv.style.transition = 'none';
                     burst.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(0)';
                     burst.shockwaveDiv.style.opacity = '1';
                     burst.shockwaveDiv.style.left = lastHeldX + 'px';
                     burst.shockwaveDiv.style.top = lastHeldY + 'px';
-                    void burst.shockwaveDiv.offsetWidth; // Force reflow
+                    void burst.shockwaveDiv.offsetWidth; 
                     burst.shockwaveDiv.style.transition = 'width 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), height 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), transform 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 15.0s ease-out';
                     burst.shockwaveDiv.style.width = 'var(--max-size)';
                     burst.shockwaveDiv.style.height = 'var(--max-size)';
                     burst.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(1)';
                     burst.shockwaveDiv.style.opacity = '0'; 
+
+                    // --- [신규] 빠른 두 번째 충격파 (2배 빠른 7.5초) ---
+                    const fastShockwave = burst.fastShockwaveDiv;
+                    fastShockwave.style.transition = 'none';
+                    fastShockwave.style.transform = 'translate(-50%, -50%) scale(0)';
+                    fastShockwave.style.opacity = '1';
+                    fastShockwave.style.left = lastHeldX + 'px';
+                    fastShockwave.style.top = lastHeldY + 'px';
+                    
+                    // 폭발 '직후'에 터지는 느낌을 위해 0.15초 (150ms) 딜레이 후 실행
+                    setTimeout(() => {
+                        void fastShockwave.offsetWidth;
+                        fastShockwave.style.transition = 'width 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), height 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), transform 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 7.5s ease-out';
+                        fastShockwave.style.width = 'var(--max-size)';
+                        fastShockwave.style.height = 'var(--max-size)';
+                        fastShockwave.style.transform = 'translate(-50%, -50%) scale(1)';
+                        fastShockwave.style.opacity = '0';
+                    }, 150);
+
 
                     const burstTarget3D = getMouse3DTarget();
                     burst.meteorMat.opacity = 1.0; 
@@ -548,7 +577,6 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // 포인터 빛 산란 구체 업데이트
             let mousePos3D = new THREE.Vector3(mouseX, mouseY, 0.5); 
             mousePos3D.unproject(camera); 
             let dir = mousePos3D.sub(camera.position).normalize(); 
@@ -591,7 +619,6 @@
                 }
             });
 
-            // --- 4. 다중 폭발 풀 애니메이션 업데이트 ---
             burstPool.forEach(burst => {
                 if (burst.active) {
                     burst.time += 0.016;
@@ -605,7 +632,6 @@
                         });
                     }
 
-                    // 수명(12초)이 다하면 비활성화하여 다음 사용 대기
                     if (burst.time > 12.0) {
                         burst.active = false;
                         burst.particlesMesh.visible = false;
