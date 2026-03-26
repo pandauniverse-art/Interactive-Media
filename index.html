@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 6s Expand & 3s Blackhole Condense</title>
+    <title>Deep Space - Heavy Blackhole Condense</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -275,10 +275,10 @@
         
         const meteors = [];         
         const chargingMeteors = []; 
-        const condenseMeteors = []; // 신규: 블랙홀 흡수용 파티클/유성 배열
+        const condenseMeteors = []; 
         
         const maxChargingMeteors = Math.floor(400 * Q_MULT);
-        const maxCondenseMeteors = Math.floor(800 * Q_MULT); // 신규: 800개의 강력한 흡수 파티클
+        const maxCondenseMeteors = Math.floor(800 * Q_MULT); 
         const maxBurstMeteors = Math.floor(1800 * Q_MULT);
         const startChargingMeteors = Math.floor(50 * Q_MULT);
         const chargingMeteorRange = maxChargingMeteors - startChargingMeteors;
@@ -345,7 +345,7 @@
 
             createMeteors(Math.floor(300 * Q_MULT));
             createChargingMeteors(maxChargingMeteors);
-            createCondenseMeteors(maxCondenseMeteors); // 신규 블랙홀 입자 생성
+            createCondenseMeteors(maxCondenseMeteors); 
 
             for(let i = 0; i < MAX_BURSTS; i++) {
                 createBurstInstance();
@@ -496,10 +496,8 @@
             }
         }
 
-        // 1. 신규 블랙홀 흡수용 입자(파티클+유성 혼합) 생성 함수
         function createCondenseMeteors(count) {
             for(let i = 0; i < count; i++) {
-                // 50% 확률로 짧고 굵은 파티클(점), 50% 확률로 긴 유성(선)
                 let isParticle = Math.random() > 0.5;
                 let length = isParticle ? 50 : 2000;
                 let radius = isParticle ? 4.0 : 1.2;
@@ -507,7 +505,7 @@
                 const geom = new THREE.CylinderGeometry(radius, radius*0.2, length, 3); 
                 geom.rotateX(Math.PI / 2); 
                 
-                let color = Math.random() > 0.5 ? 0xffffff : 0x88ddff; // 흰색과 청록색 믹스
+                let color = Math.random() > 0.5 ? 0xffffff : 0x88ddff; 
                 const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthTest: false });
                 const meteor = new THREE.Mesh(geom, mat);
                 meteor.userData.active = false;
@@ -527,10 +525,9 @@
             meteor.userData.speed = 40 + Math.random() * 60; 
         }
 
-        // 흡수 입자 리셋 (거리가 더 멀고 속도가 엄청나게 빠름)
         function resetCondenseMeteor(meteor, targetPos) {
             const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2.0 * Math.random() - 1.0); // 구면 좌표계로 360도 사방에서 스폰
+            const phi = Math.acos(2.0 * Math.random() - 1.0); 
             const radius = 4000 + Math.random() * 3000; 
             
             meteor.position.set(
@@ -538,7 +535,11 @@
                 targetPos.y + Math.sin(phi) * Math.sin(theta) * radius,
                 targetPos.z + Math.cos(phi) * radius
             );
-            meteor.userData.speed = 150 + Math.random() * 200; // 빨려 들어가는 맹렬한 속도
+            
+            // 신규: 40% ~ 50% 수준으로 감속된 묵직한 속도 적용
+            let originalSpeed = 150 + Math.random() * 200; 
+            let speedMultiplier = 0.4 + Math.random() * 0.1; // 40~50% 랜덤
+            meteor.userData.speed = originalSpeed * speedMultiplier; 
         }
 
         function getMouse3DTarget() {
@@ -582,7 +583,6 @@
                 targetProgress = 0.0;
                 
                 if(currentProgress > 0.05) { 
-                    // 2. 폭발 타이밍 계산 수정 (6초 이후의 응축량을 3초로 나눔)
                     let condenseProgress = Math.max(0.0, Math.min(1.0, (holdTime - 6.0) / 3.0));
                     let burstIntensity = Math.max(0.05, currentProgress) + condenseProgress * 1.5; 
 
@@ -718,12 +718,10 @@
             let distance = (1000 - camera.position.z) / dir.z; 
             let finalPos = camera.position.clone().add(dir.multiplyScalar(distance)); 
             
-            // 3. 타이밍 6초 + 3초 (총 9초) 기준 글리치 및 응축 로직 업데이트
             let isGlitching = false;
             let glitchIntensity = 0.0;
             let shake = 0.0;
             
-            // 응축 진행률 (6초 ~ 9초 구간, 최대 3초 동안 0.0 ~ 1.0)
             let condenseProgressRaw = 0.0;
             if (isHolding && holdTime > 6.0) {
                 condenseProgressRaw = Math.min(1.0, (holdTime - 6.0) / 3.0);
@@ -733,7 +731,6 @@
             let scaleMultiplier = 1.0 - (0.4 * smoothCondense);
 
             if (isHolding) {
-                // 4.8초(80%)부터 잔진동 글리치 시작, 6초부터 극한 진동
                 if (holdTime > 4.8 && holdTime <= 6.0) {
                     isGlitching = true;
                     glitchIntensity = (holdTime - 4.8) / 1.2; 
@@ -802,7 +799,7 @@
                 }
             });
 
-            // 4. 신규 블랙홀 흡수 파티클 처리 (6초 이후부터 스폰되어 엄청난 속도로 빨려 들어감)
+            // 추가된 흡수용 파티클 애니메이션
             condenseMeteors.forEach((meteor, index) => {
                 if (isHolding && smoothCondense > 0.0) {
                     let activeCount = Math.floor(maxCondenseMeteors * smoothCondense);
@@ -816,7 +813,6 @@
                         
                         const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
                         meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-                        // 매우 빠른 속도로 중앙으로 이동
                         meteor.position.add(dir.multiplyScalar(meteor.userData.speed));
 
                         if (meteor.position.distanceTo(mouseTarget3D) < 300) {
