@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 20% Speed Meteor Shower & Ultimate Burst</title>
+    <title>Deep Space - Energy Gathering Meteors</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -186,7 +186,10 @@
         const BG_PARTICLE_COUNT = 160000; 
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
-        const meteors = [];
+        
+        // 두 종류의 유성 배열 분리
+        const meteors = [];         // 배경용 (기존)
+        const chargingMeteors = []; // 차징용 (신규)
 
         init();
         animate();
@@ -200,6 +203,7 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
 
+            // 1. 배경 우주 파티클 (기존)
             const bgGeom = new THREE.BufferGeometry();
             const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
             const bgSizes = new Float32Array(BG_PARTICLE_COUNT);
@@ -228,6 +232,7 @@
             bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
             scene.add(bgParticles);
 
+            // 2. 폭발 전용 파티클 (기존)
             const burstGeom = new THREE.BufferGeometry();
             const burstPos = new Float32Array(BURST_PARTICLE_COUNT * 3);
             const burstVel = new Float32Array(BURST_PARTICLE_COUNT * 3);
@@ -264,7 +269,11 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
+            // 3. 기존 배경 유성우 (300개, 느린 속도)
             createMeteors(300);
+            
+            // 4. 신규 차징 유성우 (100개)
+            createChargingMeteors(100);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -280,10 +289,10 @@
             window.addEventListener('resize', onWindowResize);
         }
 
+        /* ----- 기존 배경 유성 함수 ----- */
         function createMeteors(count) {
             const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
             meteorGeometry.rotateX(Math.PI / 2); 
-            
             const meteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffffff, 
                 transparent: true, 
@@ -291,7 +300,6 @@
                 blending: THREE.AdditiveBlending,
                 depthTest: false
             });
-
             for(let i = 0; i < count; i++) {
                 const meteor = new THREE.Mesh(meteorGeometry, meteorMaterial);
                 resetMeteor(meteor);
@@ -306,15 +314,62 @@
                 (Math.random() - 0.5) * 4000, 
                 -2000 - Math.random() * 4000 
             );
-            
-            // 1. 유성 속도를 기존(100%) 대비 20% 수준으로 대폭 감속
             meteor.userData.velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 2.4,   // 기존 12 -> 2.4
-                (Math.random() - 0.5) * 2.4 - 0.4, // 기존 12, -2 -> 2.4, -0.4
-                8 + Math.random() * 8          // 기존 40 ~ 80 -> 8 ~ 16
+                (Math.random() - 0.5) * 2.4,   
+                (Math.random() - 0.5) * 2.4 - 0.4, 
+                8 + Math.random() * 8          
             );
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
+
+        /* ----- 신규 차징 전용 유성 함수 ----- */
+        function createChargingMeteors(count) {
+            const geom = new THREE.CylinderGeometry(2, 0.2, 800, 3); // 살짝 더 두껍게
+            geom.rotateX(Math.PI / 2); 
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: 0xaaddff, // 에너지가 모이는 느낌을 위해 살짝 푸른빛
+                transparent: true, 
+                opacity: 0.0, // 초기엔 보이지 않음
+                blending: THREE.AdditiveBlending,
+                depthTest: false
+            });
+            for(let i = 0; i < count; i++) {
+                const meteor = new THREE.Mesh(geom, mat);
+                meteor.userData.active = false;
+                scene.add(meteor);
+                chargingMeteors.push(meteor);
+            }
+        }
+
+        // 2D 마우스 좌표를 3D 공간의 목표점(Center)으로 변환
+        function getMouse3DTarget() {
+            let vec = new THREE.Vector3(mouseX, mouseY, 0.5);
+            vec.unproject(camera);
+            let dir = vec.sub(camera.position).normalize();
+            let dist = -camera.position.z / dir.z; // Z = 0 평면 기준
+            return camera.position.clone().add(dir.multiplyScalar(dist));
+        }
+
+        function resetChargingMeteor(meteor, targetPos) {
+            // 마우스 포인트 기준 사방(구형)에서 생성
+            const theta = Math.random() * Math.PI * 2;
+            const radius = 3000 + Math.random() * 3000; // 멀리서부터
+            const zDist = (Math.random() - 0.5) * 4000;
+
+            meteor.position.set(
+                targetPos.x + Math.cos(theta) * radius,
+                targetPos.y + Math.sin(theta) * radius,
+                targetPos.z + zDist
+            );
+
+            // 마우스를 향하는 방향 벡터 설정
+            const dir = new THREE.Vector3().subVectors(targetPos, meteor.position).normalize();
+            meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+            
+            meteor.userData.direction = dir;
+            meteor.userData.speed = 100 + Math.random() * 150; // 빠르게 빨려들어옴
+        }
+
 
         function updateExplosionCenter(clientX, clientY) {
             mouseX = (clientX - window.innerWidth / 2) / (window.innerWidth / 2);
@@ -414,10 +469,43 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
+            // 1. 기존 배경 유성 애니메이션
             meteors.forEach(meteor => {
                 meteor.position.add(meteor.userData.velocity);
                 if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
                     resetMeteor(meteor);
+                }
+            });
+
+            // 2. 신규 차징 유성 애니메이션 처리
+            const mouseTarget3D = getMouse3DTarget();
+            
+            chargingMeteors.forEach(meteor => {
+                if (isHolding) {
+                    // 처음 활성화 될 때 초기화
+                    if (meteor.material.opacity === 0 && !meteor.userData.active) {
+                        resetChargingMeteor(meteor, mouseTarget3D);
+                        meteor.userData.active = true;
+                    }
+
+                    // 차징이 진행될수록 서서히 나타남
+                    meteor.material.opacity = Math.min(meteor.material.opacity + 0.05, 0.8 * currentProgress);
+
+                    // 마우스가 이동하면 실시간으로 궤도를 수정하여 쫓아감 (Homing)
+                    const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
+                    meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+                    meteor.position.add(dir.multiplyScalar(meteor.userData.speed));
+
+                    // 마우스 중심점에 도착하면 화면 밖에서 다시 생성
+                    if (meteor.position.distanceTo(mouseTarget3D) < 300) {
+                        resetChargingMeteor(meteor, mouseTarget3D);
+                    }
+                } else {
+                    // 손을 떼면 서서히 사라짐
+                    meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
+                    if (meteor.material.opacity === 0) {
+                        meteor.userData.active = false;
+                    }
                 }
             });
 
