@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Flashbang & Supernova Burst</title>
+    <title>Deep Space - 3s Flashbang & Supernova Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -133,18 +133,17 @@
             will-change: transform, opacity, width, height;
         }
 
-        /* 1. 신규 추가: 폭발 순간 화면을 뒤덮는 강력한 플래시 이펙트 */
         .flash-effect {
             position: fixed;
-            width: 300vmin; /* 화면 전체를 덮을 만큼 거대하게 */
+            width: 300vmin; 
             height: 300vmin;
             transform: translate(-50%, -50%) scale(0);
             opacity: 0;
             pointer-events: none;
-            z-index: 105; /* 모든 이펙트 위에서 번쩍이도록 설정 */
+            z-index: 105; 
             mix-blend-mode: screen;
             background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,1) 10%, rgba(100,180,255,0.5) 30%, transparent 70%);
-            filter: blur(10px) brightness(3.0); /* 극단적인 밝기와 블러로 광원 표현 */
+            filter: blur(10px) brightness(3.0); 
             will-change: transform, opacity;
         }
     </style>
@@ -372,7 +371,6 @@
             fastShockwaveDiv.className = 'fast-shockwave-effect';
             document.body.appendChild(fastShockwaveDiv);
 
-            // 2. 신규 발광(플래시) DOM 요소 생성
             const flashDiv = document.createElement('div');
             flashDiv.className = 'flash-effect';
             document.body.appendChild(flashDiv);
@@ -439,7 +437,7 @@
                 burstDiv: burstDiv,
                 shockwaveDiv: shockwaveDiv,
                 fastShockwaveDiv: fastShockwaveDiv, 
-                flashDiv: flashDiv, // 플래시 객체 추가
+                flashDiv: flashDiv, 
                 particlesMat: particlesMat,
                 particlesMesh: particlesMesh,
                 meteorMat: meteorMat,
@@ -539,16 +537,15 @@
                     burst.particlesMesh.visible = true;
                     burst.particlesMat.uniforms.uBurstCenter.value.set(mouseX, mouseY);
 
-                    // 3. 플래시뱅 이펙트 트리거 (가장 먼저 폭발적으로 밝아짐)
+                    // 1. 번쩍이는 플래시 지속시간 3초로 연장
                     const flash = burst.flashDiv;
                     flash.style.transition = 'none';
                     flash.style.transform = 'translate(-50%, -50%) scale(0.1)';
                     flash.style.opacity = '1';
                     flash.style.left = lastHeldX + 'px';
                     flash.style.top = lastHeldY + 'px';
-                    void flash.offsetWidth; // 리플로우 강제 트리거
-                    // 0.1초만에 화면을 덮고, 1.5초에 걸쳐 부드럽게 잔상을 남기며 사라짐
-                    flash.style.transition = 'transform 0.1s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 1.5s cubic-bezier(0.1, 0.8, 0.2, 1)';
+                    void flash.offsetWidth; 
+                    flash.style.transition = 'transform 0.15s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 3.0s ease-out';
                     flash.style.transform = 'translate(-50%, -50%) scale(1)';
                     flash.style.opacity = '0';
 
