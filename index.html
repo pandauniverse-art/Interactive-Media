@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Condensed Core & Ultimate Supernova</title>
+    <title>Deep Space - Smooth Condense & Ultimate Supernova</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
+        /* 레이어 1: 가장 넓고 은은하게 퍼지는 후광 (24vmin) */
         #rayEffectGlow {
             position: fixed;
-            width: 0vmin; 
-            height: 0vmin;
-            --max-size: 24vmin; 
+            width: 24vmin; 
+            height: 24vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0; 
             pointer-events: none;
@@ -24,15 +24,14 @@
             border-radius: 50%;
             filter: blur(16px); 
             box-shadow: 0 0 150px 80px rgba(100, 180, 255, 0.4);
-            animation: spin 15s linear infinite; 
-            will-change: transform, opacity, width, height;
+            will-change: transform, opacity;
         }
 
+        /* 레이어 2: 중심을 잡아주는 베이스 코어 (12vmin) */
         #rayEffect {
             position: fixed;
-            width: 0vmin; 
-            height: 0vmin;
-            --max-size: 12vmin;
+            width: 12vmin; 
+            height: 12vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0;
             pointer-events: none;
@@ -44,15 +43,14 @@
             border-radius: 50%;
             filter: blur(2px); 
             box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5);
-            animation: spin 10s linear infinite;
-            will-change: transform, opacity, width, height;
+            will-change: transform, opacity;
         }
 
+        /* 레이어 3: 밝게 타오르는 오버레이 (12vmin) */
         #rayEffectOverlay {
             position: fixed;
-            width: 0vmin; 
-            height: 0vmin;
-            --max-size: 12vmin;
+            width: 12vmin; 
+            height: 12vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0; 
             pointer-events: none;
@@ -64,31 +62,25 @@
             border-radius: 50%;
             filter: blur(4px); 
             box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.7);
-            animation: spin-reverse 8s linear infinite;
-            will-change: transform, opacity, width, height, box-shadow;
+            will-change: transform, opacity, box-shadow;
         }
 
-        /* 1. 신규 추가: 10초 후 나타나는 초고밀도 에너지 압축 레이어 */
+        /* 레이어 4: 10초 이후 나타나는 초고밀도 에너지 압축 레이어 (14vmin) */
         #rayEffectCondensed {
             position: fixed;
-            width: 0vmin; 
-            height: 0vmin;
-            --max-size: 12vmin; 
+            width: 14vmin; 
+            height: 14vmin;
             transform: translate(-50%, -50%) scale(0); 
             opacity: 0; 
             pointer-events: none;
             z-index: 102; 
             mix-blend-mode: screen; 
-            background: radial-gradient(circle, #ffffff 0%, #dcf0ff 40%, transparent 80%);
+            background: radial-gradient(circle, #ffffff 10%, #dcf0ff 50%, transparent 80%);
             border-radius: 50%;
             filter: blur(2px) brightness(3.0); 
-            box-shadow: 0 0 150px 80px #ffffff, 0 0 250px 100px #00aaff;
-            animation: spin 3s linear infinite; /* 매우 빠르게 회전하여 불안정한 에너지 표현 */
-            will-change: transform, opacity, width, height;
+            box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.9), 0 0 200px 80px rgba(0, 170, 255, 0.6);
+            will-change: transform, opacity;
         }
-
-        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
-        @keyframes spin-reverse { 100% { transform: translate(-50%, -50%) rotate(-360deg); } }
 
         .burst-effect {
             position: fixed;
@@ -162,7 +154,9 @@
     <div id="rayEffectGlow"></div>
     <div id="rayEffect"></div>
     <div id="rayEffectOverlay"></div>
-    <div id="rayEffectCondensed"></div> <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <div id="rayEffectCondensed"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script id="bgVertexShader" type="x-shader/x-vertex">
         uniform float uTime;
@@ -270,14 +264,14 @@
         
         let targetProgress = 0.0;
         let currentProgress = 0.0; 
-        let rayScale = 0.0; 
-        let rayOpacity = 0.0; 
         let explosionBrightness = 2.0; 
 
-        // 2. 정확한 초 단위 측정을 위한 변수 추가
+        // 시간에 따른 정밀 제어 변수
         let holdTime = 0.0; 
-        let globalCondenseProgress = 0.0;
         let lastFrameTime = performance.now();
+        // 각 레이어 회전 각도 독립 계산 (덮어쓰기 방지)
+        let rotAngle1 = 0;
+        let rotAngle2 = 0;
 
         let mouseGlow; 
 
@@ -319,7 +313,7 @@
             rayEffectGlow = document.getElementById('rayEffectGlow');
             rayEffect = document.getElementById('rayEffect');
             rayEffectOverlay = document.getElementById('rayEffectOverlay'); 
-            rayEffectCondensed = document.getElementById('rayEffectCondensed'); // 응축 레이어 가져오기
+            rayEffectCondensed = document.getElementById('rayEffectCondensed');
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
@@ -513,8 +507,7 @@
             const dir = new THREE.Vector3().subVectors(targetPos, meteor.position).normalize();
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             meteor.userData.direction = dir;
-            // 응축 단계(10초 이후)에서는 모여드는 속도도 더욱 가속됨
-            meteor.userData.speed = 40 + Math.random() * 60 + (globalCondenseProgress * 150.0); 
+            meteor.userData.speed = 40 + Math.random() * 60; 
         }
 
         function getMouse3DTarget() {
@@ -546,7 +539,7 @@
         function triggerHoldStart(clientX, clientY) {
             isHolding = true; 
             targetProgress = 1.0;
-            holdTime = 0.0; // 클릭 시 타이머 리셋
+            holdTime = 0.0; 
             lastHeldX = clientX;
             lastHeldY = clientY;
             updateExplosionCenter(clientX, clientY);
@@ -558,7 +551,7 @@
                 targetProgress = 0.0;
                 
                 if(currentProgress > 0.05) { 
-                    // 3. 10초 이후 응축된 에너지를 폭발 강도(최대 2.5배)에 연산 합산
+                    // 10초 이후 응축 진행도를 바탕으로 폭발 강도 증폭 (최대 2.5배)
                     let condenseProgress = Math.max(0.0, Math.min(1.0, (holdTime - 10.0) / 5.0));
                     let burstIntensity = Math.max(0.05, currentProgress) + condenseProgress * 1.5; 
 
@@ -628,7 +621,6 @@
                     const burstTarget3D = getMouse3DTarget();
                     burst.meteorMat.opacity = 1.0; 
 
-                    // 100%를 초과하는 응축 폭발 시 최대 1800개 제한 내에서 모두 발사
                     const activeMeteorCount = Math.min(burst.meteors.length, Math.floor(burst.meteors.length * burstIntensity));
 
                     burst.meteors.forEach((meteor, index) => {
@@ -678,7 +670,6 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // 정확한 초 단위 측정을 위해 Delta Time 계산
             let dt = (time - lastFrameTime) / 1000.0;
             if (dt > 0.1 || isNaN(dt)) dt = 0.016; 
             lastFrameTime = time;
@@ -687,52 +678,58 @@
                 holdTime += dt;
             }
 
+            // JS에서 부드러운 회전 각도를 계산하여 CSS 충돌 방지
+            rotAngle1 += 30 * dt; 
+            rotAngle2 -= 45 * dt;
+
             let mousePos3D = new THREE.Vector3(mouseX, mouseY, 0.5); 
             mousePos3D.unproject(camera); 
             let dir = mousePos3D.sub(camera.position).normalize(); 
             let distance = (1000 - camera.position.z) / dir.z; 
             let finalPos = camera.position.clone().add(dir.multiplyScalar(distance)); 
             
-            // --- 4. 10초 응축 및 글리치 로직 업데이트 ---
+            // --- 컷 전환 방지: 매끄러운 글리치 및 응축 로직 ---
             let isGlitching = false;
             let glitchIntensity = 0.0;
             let shake = 0.0;
-            let sizeMult = 1.0; // 코어 크기 조절 계수
-
-            globalCondenseProgress = 0.0;
+            
+            // 응축 진행률 (0.0 ~ 1.0)
+            let condenseProgressRaw = 0.0;
+            if (isHolding && holdTime > 10.0) {
+                condenseProgressRaw = Math.min(1.0, (holdTime - 10.0) / 5.0);
+            }
+            
+            // 뚝 끊기지 않도록 부드러운 곡선(Ease-in-out) 적용
+            let smoothCondense = condenseProgressRaw * condenseProgressRaw * (3 - 2 * condenseProgressRaw);
+            
+            // 각자의 원래 크기에서 최대 60%까지 부드럽게 감소 (1.0 -> 0.6)
+            let scaleMultiplier = 1.0 - (0.4 * smoothCondense);
 
             if (isHolding) {
-                if (holdTime > 10.0) {
-                    // 10초 이후: 에너지가 한 점으로 응축되며 60% 크기로 줄어듦
-                    globalCondenseProgress = Math.min(1.0, (holdTime - 10.0) / 5.0);
-                    sizeMult = 1.0 - (0.4 * globalCondenseProgress); // 1.0 -> 0.6
-                    
+                if (holdTime > 8.0 && holdTime <= 10.0) {
                     isGlitching = true;
-                    glitchIntensity = 1.0 + globalCondenseProgress; // 극단적인 글리치 (1.0 ~ 2.0)
-                    shake = 40.0 + globalCondenseProgress * 50.0; 
-                    
-                    let glitchOffset = (Math.random() - 0.5) * 100 * glitchIntensity;
-                    rayEffectOverlay.style.boxShadow = `${glitchOffset}px 0px 0px rgba(255, 0, 100, 1.0), ${-glitchOffset}px 0px 0px rgba(0, 255, 255, 1.0), 0 0 100px 50px rgba(255, 255, 255, 0.9)`;
-                } else if (currentProgress > 0.8) {
-                    // 8~10초 사이: 일반 글리치 시작
+                    glitchIntensity = (holdTime - 8.0) / 2.0; // 0.0 -> 1.0 자연스럽게 상승
+                } else if (holdTime > 10.0) {
                     isGlitching = true;
-                    glitchIntensity = (currentProgress - 0.8) * 5.0; // 0.0 ~ 1.0
-                    shake = glitchIntensity * 40.0;
-                    
-                    let glitchOffset = (Math.random() - 0.5) * 60 * glitchIntensity;
-                    rayEffectOverlay.style.boxShadow = `${glitchOffset}px 0px 0px rgba(255, 0, 100, 0.8), ${-glitchOffset}px 0px 0px rgba(0, 255, 255, 0.8), 0 0 100px 50px rgba(255, 255, 255, 0.7)`;
+                    glitchIntensity = 1.0 + smoothCondense; // 1.0 -> 2.0 상승
                 }
             }
 
             if (isGlitching) {
+                shake = glitchIntensity * 40.0;
                 scene.position.x = (Math.random() - 0.5) * shake;
                 scene.position.y = (Math.random() - 0.5) * shake;
+                
                 mouseGlow.material.opacity = 0.3 + Math.random() * 0.7;
                 let scale = 150 + (Math.random() - 0.5) * 80 * glitchIntensity;
                 mouseGlow.scale.set(scale, scale, 1);
+                
+                let glitchOffset = (Math.random() - 0.5) * 60 * glitchIntensity;
+                rayEffectOverlay.style.boxShadow = `${glitchOffset}px 0px 0px rgba(255, 0, 100, 0.8), ${-glitchOffset}px 0px 0px rgba(0, 255, 255, 0.8), 0 0 100px 50px rgba(255, 255, 255, 0.7)`;
             } else {
                 scene.position.x += (0 - scene.position.x) * 0.1;
                 scene.position.y += (0 - scene.position.y) * 0.1;
+                
                 mouseGlow.material.opacity = 0.8;
                 mouseGlow.scale.set(150, 150, 1);
                 rayEffectOverlay.style.boxShadow = `0 0 100px 50px rgba(255, 255, 255, 0.7)`;
@@ -762,7 +759,10 @@
                     }
                     const dirCharging = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
                     meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirCharging);
-                    meteor.position.add(dirCharging.multiplyScalar(meteor.userData.speed));
+                    
+                    // 응축 단계(10초 이후)에서는 모여드는 속도도 더욱 가속됨
+                    let speedMult = 1.0 + (smoothCondense * 3.0);
+                    meteor.position.add(dirCharging.multiplyScalar(meteor.userData.speed * speedMult));
 
                     if (meteor.position.distanceTo(mouseTarget3D) < 200) {
                         resetChargingMeteor(meteor, mouseTarget3D);
@@ -800,29 +800,14 @@
             let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
             
-            // 5. 응축 스케일(sizeMult)을 적용하여 시각적으로 쪼그라들게 만듦
-            rayScale = currentProgress * sizeMult; 
-            rayOpacity = currentProgress; 
-            
-            rayEffectGlow.style.width = `calc(var(--max-size) * ${currentProgress})`;
-            rayEffectGlow.style.height = `calc(var(--max-size) * ${currentProgress})`;
-            
-            rayEffect.style.width = `calc(var(--max-size) * ${currentProgress})`;
-            rayEffect.style.height = `calc(var(--max-size) * ${currentProgress})`;
-            
-            rayEffectOverlay.style.width = `calc(var(--max-size) * ${currentProgress})`;
-            rayEffectOverlay.style.height = `calc(var(--max-size) * ${currentProgress})`;
-
-            // 압축 코어 (10초 이후 생성됨)
-            rayEffectCondensed.style.width = `calc(var(--max-size) * ${currentProgress})`;
-            rayEffectCondensed.style.height = `calc(var(--max-size) * ${currentProgress})`;
+            // 매끄럽게 연결된 최종 스케일 계산 (폭발적인 컷 전환 방지)
+            let finalScale = currentProgress * scaleMultiplier;
 
             bgParticlesMaterial.uniforms.uGatherProgress.value = currentProgress;
             bgParticlesMaterial.uniforms.uTime.value = time * 0.001; 
 
             if (isHolding) {
-                // 응축 시 폭발적으로 밝아짐
-                explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 158.0 + (globalCondenseProgress * 300.0); 
+                explosionBrightness = 2.0 + Math.pow(currentProgress, 5.0) * 158.0 + (smoothCondense * 300.0); 
             } else {
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
             }
@@ -839,23 +824,24 @@
             rayEffectCondensed.style.left = lastHeldX + 'px';
             rayEffectCondensed.style.top = lastHeldY + 'px';
 
-            if (rayScale > 0.01) {
-                rayEffectGlow.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
+            if (finalScale > 0.01) {
+                // width 속성 제거 후 transform scale 만을 이용하여 개별 비율 유지 및 부드러운 스케일링
+                rayEffectGlow.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 0.5}deg)`;
                 rayEffectGlow.style.opacity = currentProgress; 
                 rayEffectGlow.style.filter = `blur(16px) brightness(${explosionBrightness})`; 
                 
-                rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
-                rayEffect.style.opacity = rayOpacity;
+                rayEffect.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1}deg)`;
+                rayEffect.style.opacity = currentProgress;
                 rayEffect.style.filter = `blur(2px) brightness(${explosionBrightness})`; 
                 
-                rayEffectOverlay.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
+                rayEffectOverlay.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle2}deg)`;
                 rayEffectOverlay.style.opacity = currentProgress; 
                 rayEffectOverlay.style.filter = `blur(4px) brightness(${explosionBrightness * 1.5})`; 
 
-                // 신규 초고밀도 레이어
-                rayEffectCondensed.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
-                rayEffectCondensed.style.opacity = globalCondenseProgress; 
-                rayEffectCondensed.style.filter = `blur(${2 + globalCondenseProgress * 2}px) brightness(${explosionBrightness * 2.0})`;
+                // 신규 초고밀도 에너지 레이어 (10~15초 사이 투명도 서서히 차오름)
+                rayEffectCondensed.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 2.0}deg)`;
+                rayEffectCondensed.style.opacity = smoothCondense; 
+                rayEffectCondensed.style.filter = `blur(${2 + smoothCondense * 2}px) brightness(${explosionBrightness * 2.0})`;
             } else {
                 rayEffectGlow.style.transform = `translate(-50%, -50%) scale(0)`;
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
