@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Ultimate Meteor Burst</title>
+    <title>Deep Space - Dynamic Charge & Slow Meteor Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -187,11 +187,10 @@
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
         
-        // 유성 시스템 배열 관리
-        const meteors = [];         // 배경용 (기존 300개)
-        const chargingMeteors = []; // 차징용 (안으로 모이는 100개)
-        const burstMeteors = [];    // 폭발용 (밖으로 퍼지는 300개)
-        let burstMeteorMaterial;    // 폭발 유성 전용 재질 (일괄 페이드아웃 용도)
+        const meteors = [];         
+        const chargingMeteors = []; 
+        const burstMeteors = [];    
+        let burstMeteorMaterial;    
 
         init();
         animate();
@@ -205,7 +204,6 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 15000);
             camera.position.z = 2500;
 
-            // 1. 배경 우주 파티클 (16만개)
             const bgGeom = new THREE.BufferGeometry();
             const bgPos = new Float32Array(BG_PARTICLE_COUNT * 3);
             const bgSizes = new Float32Array(BG_PARTICLE_COUNT);
@@ -234,7 +232,6 @@
             bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
             scene.add(bgParticles);
 
-            // 2. 폭발 미세 파티클 (12만개)
             const burstGeom = new THREE.BufferGeometry();
             const burstPos = new Float32Array(BURST_PARTICLE_COUNT * 3);
             const burstVel = new Float32Array(BURST_PARTICLE_COUNT * 3);
@@ -271,13 +268,11 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
-            // 3. 기존 배경 유성우 (300개, 느린 속도 20%)
             createMeteors(300);
             
-            // 4. 차징 유성우 (안으로 모이는 100개)
-            createChargingMeteors(100);
+            // 1. 최대 개수 기준인 200개로 차징 유성 배열 초기화 (기존 100개의 200%)
+            createChargingMeteors(200);
 
-            // 5. 신규 폭발 방사형 유성우 (밖으로 터지는 300개)
             createBurstMeteors(300);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -294,7 +289,6 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        /* ----- 기존 배경 유성 ----- */
         function createMeteors(count) {
             const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
             meteorGeometry.rotateX(Math.PI / 2); 
@@ -327,7 +321,6 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
-        /* ----- 차징 전용 유성 (안으로 모임) ----- */
         function createChargingMeteors(count) {
             const geom = new THREE.CylinderGeometry(2, 0.2, 800, 3); 
             geom.rotateX(Math.PI / 2); 
@@ -361,16 +354,16 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             
             meteor.userData.direction = dir;
-            meteor.userData.speed = 100 + Math.random() * 150; 
+            // 2. 모이는 속도 50% 수준으로 감속 (100~250 -> 50~125)
+            meteor.userData.speed = 50 + Math.random() * 75; 
         }
 
-        /* ----- [신규] 폭발 방사형 유성 (밖으로 터짐) ----- */
         function createBurstMeteors(count) {
-            const geom = new THREE.CylinderGeometry(2, 0.2, 1200, 3); // 궤적을 좀 더 길게
+            const geom = new THREE.CylinderGeometry(2, 0.2, 1200, 3);
             geom.rotateX(Math.PI / 2); 
             
             burstMeteorMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0xffddaa, // 폭발의 열기를 표현하는 따뜻한 코어 색상
+                color: 0xffddaa, 
                 transparent: true, 
                 opacity: 0.0, 
                 blending: THREE.AdditiveBlending,
@@ -384,7 +377,6 @@
             }
         }
 
-        // 2D 마우스 좌표를 3D 공간의 목표점(Center)으로 변환
         function getMouse3DTarget() {
             let vec = new THREE.Vector3(mouseX, mouseY, 0.5);
             vec.unproject(camera);
@@ -434,7 +426,6 @@
                     isBursting = true;
                     burstTime = 0.0;
                     
-                    // 기존 폭발 트리거들
                     burstParticlesMaterial.visible = true;
                     burstParticlesMaterial.uniforms.uBurstCenter.value.set(mouseX, mouseY);
                     explosionBrightness = Math.max(240.0, explosionBrightness * 2.0); 
@@ -471,20 +462,19 @@
                         shockwaveEffect.style.opacity = '0'; 
                     });
 
-                    // --- [신규] 폭발 방사형 유성 방향 설정 ---
                     const burstTarget3D = getMouse3DTarget();
-                    burstMeteorMaterial.opacity = 1.0; // 투명도 100% 시작
+                    burstMeteorMaterial.opacity = 1.0; 
 
                     burstMeteors.forEach(meteor => {
-                        // 모두 폭발 중심점에서 시작
                         meteor.position.copy(burstTarget3D);
                         
-                        // 구(Sphere) 형태로 퍼져나가기 위한 3D 랜덤 방향 벡터 수식
                         const u = Math.random();
                         const v = Math.random();
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
-                        const speed = 150 + Math.random() * 250; // 빛처럼 빠르게 튕겨나감
+                        
+                        // 3. 폭발 유성 속도를 10% 수준으로 극한 감속 (150~400 -> 15~40)
+                        const speed = 15 + Math.random() * 25; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
                         const vy = Math.sin(phi) * Math.sin(theta) * speed;
@@ -493,7 +483,6 @@
                         const vel = new THREE.Vector3(vx, vy, vz);
                         meteor.userData.velocity = vel;
                         
-                        // 이동하는 방향으로 회전(대가리가 앞을 향하도록)
                         meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), vel.clone().normalize());
                     });
                 }
@@ -518,7 +507,6 @@
         function animate(time) {
             requestAnimationFrame(animate);
 
-            // 1. 기존 배경 유성
             meteors.forEach(meteor => {
                 meteor.position.add(meteor.userData.velocity);
                 if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
@@ -526,10 +514,13 @@
                 }
             });
 
-            // 2. 차징 유성 (안으로 모임)
             const mouseTarget3D = getMouse3DTarget();
-            chargingMeteors.forEach(meteor => {
-                if (isHolding) {
+            
+            // 4. 차징 진행률에 따라 화면에 나타나는 차징 유성의 개수를 30개(30%) ~ 200개(200%) 로 제한
+            const activeChargingLimit = Math.floor(30 + (170 * currentProgress));
+
+            chargingMeteors.forEach((meteor, index) => {
+                if (isHolding && index < activeChargingLimit) {
                     if (meteor.material.opacity === 0 && !meteor.userData.active) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
@@ -551,11 +542,10 @@
                 }
             });
 
-            // 3. [신규] 폭발 방사형 유성 (밖으로 퍼짐)
             if (isBursting) {
-                // 3초 동안 날아가며 자연스럽게 투명해짐(Fade-out)
-                if (burstTime < 3.0) {
-                    burstMeteorMaterial.opacity = 1.0 - (burstTime / 3.0);
+                // 5. 속도가 느려진 만큼 중간에 끊기지 않도록 페이드아웃 시간을 3.0초에서 6.0초로 연장
+                if (burstTime < 6.0) {
+                    burstMeteorMaterial.opacity = 1.0 - (burstTime / 6.0);
                     burstMeteors.forEach(meteor => {
                         meteor.position.add(meteor.userData.velocity);
                     });
