@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 900 Charging Meteors</title>
+    <title>Deep Space - Visible Charging Meteors (50 to 400)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -270,8 +270,8 @@
 
             createMeteors(300);
             
-            // 1. 최대 개수인 900개로 차징 유성(안으로 모임) 배열 상향 초기화
-            createChargingMeteors(900);
+            // 1. 최대 개수인 400개로 차징 유성 초기화
+            createChargingMeteors(400);
 
             createBurstMeteors(300);
 
@@ -321,11 +321,13 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), meteor.userData.velocity.clone().normalize());
         }
 
+        /* --- 확실하게 보이도록 차징 유성 두께와 길이 증폭 --- */
         function createChargingMeteors(count) {
-            const geom = new THREE.CylinderGeometry(2, 0.2, 800, 3); 
+            // 기존 (2, 0.2, 800) -> (4, 0.5, 1500) 으로 대폭 상향
+            const geom = new THREE.CylinderGeometry(4, 0.5, 1500, 3); 
             geom.rotateX(Math.PI / 2); 
             const mat = new THREE.MeshBasicMaterial({ 
-                color: 0xaaddff, 
+                color: 0xffffff, // 순백색으로 눈에 띄게
                 transparent: true, 
                 opacity: 0.0, 
                 blending: THREE.AdditiveBlending,
@@ -344,21 +346,26 @@
         }
 
         function resetChargingMeteor(meteor, targetPos) {
-            const theta = Math.random() * Math.PI * 2;
-            const radius = 3000 + Math.random() * 3000; 
-            const zDist = (Math.random() - 0.5) * 4000;
+            // 화면 사방에서 골고루 스폰되도록 구면 좌표계(Spherical) 활용
+            const u = Math.random();
+            const v = Math.random();
+            const theta = u * 2.0 * Math.PI;
+            const phi = Math.acos(2.0 * v - 1.0);
+            
+            // 너무 멀면 안 보이므로 적당한 외곽(2500~4000)에서 생성
+            const radius = 2500 + Math.random() * 1500; 
 
             meteor.position.set(
-                targetPos.x + Math.cos(theta) * radius,
-                targetPos.y + Math.sin(theta) * radius,
-                targetPos.z + zDist
+                targetPos.x + Math.sin(phi) * Math.cos(theta) * radius,
+                targetPos.y + Math.sin(phi) * Math.sin(theta) * radius,
+                targetPos.z + Math.cos(phi) * radius
             );
 
             const dir = new THREE.Vector3().subVectors(targetPos, meteor.position).normalize();
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             
             meteor.userData.direction = dir;
-            meteor.userData.speed = 50 + Math.random() * 75; 
+            meteor.userData.speed = 80 + Math.random() * 80; // 속도
         }
 
         function createBurstMeteors(count) {
@@ -518,28 +525,30 @@
 
             const mouseTarget3D = getMouse3DTarget();
             
-            // 2. 동적 차징 유성 개수를 30개에서 900개까지 스케일링되도록 공식 상향 (30 + 870 * progress)
-            const activeChargingLimit = Math.floor(30 + (870 * currentProgress));
+            // 2. 동적 스케일링: 시작 시 50개 ~ 최대 400개
+            const activeChargingLimit = Math.floor(50 + (350 * currentProgress));
 
             chargingMeteors.forEach((meteor, index) => {
                 if (isHolding && index < activeChargingLimit) {
-                    if (meteor.material.opacity === 0 && !meteor.userData.active) {
+                    if (!meteor.userData.active) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
                     }
                     
-                    meteor.material.opacity = Math.min(meteor.material.opacity + 0.05, 0.8);
+                    // 3. 서서히 차오르는 투명도 제거, 즉각적으로 100% 밝게 보이도록 수정
+                    meteor.material.opacity = 1.0; 
 
                     const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
                     meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
                     meteor.position.add(dir.multiplyScalar(meteor.userData.speed));
 
-                    if (meteor.position.distanceTo(mouseTarget3D) < 300) {
+                    // 마우스에 도달하면 즉시 화면 밖에서 다시 생성
+                    if (meteor.position.distanceTo(mouseTarget3D) < 200) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                     }
                 } else {
                     meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
-                    if (meteor.material.opacity === 0) {
+                    if (meteor.material.opacity <= 0) {
                         meteor.userData.active = false;
                     }
                 }
