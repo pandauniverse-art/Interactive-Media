@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Overcharged Core & 30% Speed Burst</title>
+    <title>Deep Space - Mouse Pointer Light Sphere</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -30,16 +30,15 @@
             animation: spin 10s linear infinite;
         }
 
-        /* 1. 신규 덧댄 레이어 (처음엔 투명, 나중에 100% 밝기) */
         #rayEffectOverlay {
             position: fixed;
             width: 0vmin; 
             height: 0vmin;
             --max-size: 12vmin;
             transform: translate(-50%, -50%) scale(0); 
-            opacity: 0; /* 초기 투명도 0 */
+            opacity: 0; 
             pointer-events: none;
-            z-index: 101; /* rayEffect보다 위 */
+            z-index: 101; 
             mix-blend-mode: screen; 
             
             background: 
@@ -50,7 +49,6 @@
             filter: blur(4px); 
             box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.7);
             
-            /* 기존 코어와 반대 방향으로 회전시켜 이펙트 풍성도 극대화 */
             animation: spin-reverse 8s linear infinite;
         }
 
@@ -98,7 +96,8 @@
 </head>
 <body>
     <div id="rayEffect"></div>
-    <div id="rayEffectOverlay"></div> <div id="burstEffect"></div>
+    <div id="rayEffectOverlay"></div>
+    <div id="burstEffect"></div>
     <div id="shockwaveEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -210,6 +209,8 @@
         let burstTime = 0.0;
         let isBursting = false;
 
+        let mouseSphere; // 1. 마우스 포인터 구체 메시 변수
+
         const BG_PARTICLE_COUNT = 160000; 
         const BURST_PARTICLE_COUNT = 120000; 
         const SPACE_RANGE = 10000;
@@ -224,7 +225,7 @@
 
         function init() {
             rayEffect = document.getElementById('rayEffect');
-            rayEffectOverlay = document.getElementById('rayEffectOverlay'); // 오버레이 요소 가져오기
+            rayEffectOverlay = document.getElementById('rayEffectOverlay'); 
             burstEffect = document.getElementById('burstEffect');
             shockwaveEffect = document.getElementById('shockwaveEffect');
 
@@ -299,6 +300,19 @@
             createMeteors(300);
             createChargingMeteors(400);
             createBurstMeteors(1800);
+
+            // 2. 마우스 포인터 작은 빛 구체 메시 생성 및 추가
+            const sphereGeom = new THREE.SphereGeometry(15, 16, 16); // 아주 작은 구체
+            const sphereMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, // 순백색
+                transparent: true, 
+                opacity: 0.8, 
+                blending: THREE.AdditiveBlending, // 빛나는 효과
+                depthTest: false
+            });
+            mouseSphere = new THREE.Mesh(sphereGeom, sphereMat);
+            scene.add(mouseSphere);
+            mouseSphere.position.set(0, 0, 1000); // 초기 위치 (카메라와 파티클 중심 사이 깊이)
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -505,8 +519,7 @@
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
                         
-                        // 2. 폭발 유성 속도 기존(7.5~20) 대비 30% 수준으로 극한 감속 (2.25 ~ 6.0)
-                        const speed = 2.25 + Math.random() * 3.75; 
+                        const speed = 7.5 + Math.random() * 12.5; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
                         const vy = Math.sin(phi) * Math.sin(theta) * speed;
@@ -538,6 +551,14 @@
 
         function animate(time) {
             requestAnimationFrame(animate);
+
+            // 3. 마우스 구체 위치 업데이트 (3D 공간으로 역투영)
+            let mousePos3D = new THREE.Vector3(mouseX, mouseY, 0.5); // Normalized device coordinates
+            mousePos3D.unproject(camera); // Transform to world space
+            let dir = mousePos3D.sub(camera.position).normalize(); // Direction from camera to mouse unprojected point
+            let distance = (1000 - camera.position.z) / dir.z; // Distance to reach Z=1000 plane
+            let finalPos = camera.position.clone().add(dir.multiplyScalar(distance)); // Final position on Z=1000
+            mouseSphere.position.copy(finalPos); // Update sphere position
 
             meteors.forEach(meteor => {
                 meteor.position.add(meteor.userData.velocity);
@@ -629,9 +650,8 @@
                 rayEffect.style.opacity = rayOpacity;
                 rayEffect.style.filter = `blur(2px) brightness(${explosionBrightness})`; 
                 
-                // 3. 신규 덧댄 레이어 투명도 0 -> 100% 처리
                 rayEffectOverlay.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
-                rayEffectOverlay.style.opacity = currentProgress; // 0에서 1.0(100%)까지 점진적 상승
+                rayEffectOverlay.style.opacity = currentProgress; 
                 rayEffectOverlay.style.filter = `blur(4px) brightness(${explosionBrightness * 1.5})`; 
             } else {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
