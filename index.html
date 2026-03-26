@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Sharp Charge & Massive 900 Burst</title>
+    <title>Deep Space - Supernova Burst (1800 Meteors)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -270,11 +270,11 @@
 
             createMeteors(300);
             
-            // 차징 유성(안으로 모임)
+            // 차징 유성 (안으로 모임) 400개
             createChargingMeteors(400);
 
-            // 1. 튕겨나가는 폭발 유성 개수를 3배인 900개로 상향
-            createBurstMeteors(900);
+            // 1. 폭발 유성 개수 300개 -> 1800개로 상향 (기존 대비 6배, 마지막 요청 기준 2배)
+            createBurstMeteors(1800);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -323,7 +323,7 @@
         }
 
         function createChargingMeteors(count) {
-            // 2. 모여드는 선(차징 유성)의 두께를 기존(4, 0.5)의 20% 수준인 (0.8, 0.1)로 대폭 얇게 조절
+            // 차징 유성(선) 20% 두께로 얇게 조절
             const geom = new THREE.CylinderGeometry(0.8, 0.1, 1500, 3); 
             geom.rotateX(Math.PI / 2); 
             
@@ -367,7 +367,7 @@
         function createBurstMeteors(count) {
             const geom = new THREE.CylinderGeometry(2, 0.2, 1200, 3);
             geom.rotateX(Math.PI / 2); 
-            geom.translate(0, 0, 600); // 꼬리를 원점으로 (선 긋기 효과)
+            geom.translate(0, 0, 600); 
             
             burstMeteorMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xffddaa, 
@@ -475,14 +475,15 @@
 
                     burstMeteors.forEach(meteor => {
                         meteor.position.copy(burstTarget3D);
-                        meteor.scale.set(1, 1, 0.001); // 선 긋기를 위해 길이 0으로 초기화
+                        meteor.scale.set(1, 1, 0.001); 
                         
                         const u = Math.random();
                         const v = Math.random();
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
                         
-                        const speed = 15 + Math.random() * 25; 
+                        // 2. 폭발 유성 속도 현재 기준 50% 추가 감속 (15~40 -> 7.5~20)
+                        const speed = 7.5 + Math.random() * 12.5; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
                         const vy = Math.sin(phi) * Math.sin(theta) * speed;
@@ -531,11 +532,11 @@
                     if (!meteor.userData.active) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
-                        // 3. 나타날 때 투명도 20%(0.2)로 시작
+                        // 투명도 20%로 부드럽게 시작
                         meteor.material.opacity = 0.2; 
                     }
                     
-                    // 4. 서서히 투명도 100%(1.0)까지 부드럽게 상승
+                    // 시작 투명도 20%에서 100%까지 상승 애니메이션
                     if(meteor.material.opacity < 1.0) {
                         meteor.material.opacity = Math.min(1.0, meteor.material.opacity + 0.02);
                     }
