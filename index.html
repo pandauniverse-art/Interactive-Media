@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Fixed Charging Meteors (30 to 300)</title>
+    <title>Deep Space - 900 Charging Meteors</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -268,13 +268,11 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
-            // 1. 기존 배경 유성우 (300개)
             createMeteors(300);
             
-            // 2. 최대 개수인 300개로 차징 유성(안으로 모임) 배열 초기화
-            createChargingMeteors(300);
+            // 1. 최대 개수인 900개로 차징 유성(안으로 모임) 배열 상향 초기화
+            createChargingMeteors(900);
 
-            // 3. 폭발 방사형 유성 (밖으로 퍼짐, 300개)
             createBurstMeteors(300);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -341,7 +339,6 @@
             }
         }
 
-        // 헬퍼 함수
         function MeshWithData(geom, mat) {
             return new THREE.Mesh(geom, mat);
         }
@@ -521,8 +518,8 @@
 
             const mouseTarget3D = getMouse3DTarget();
             
-            // 4. 차징 유성 개수 동적 제어 (초기 30개에서 서서히 300개로 증가)
-            const activeChargingLimit = Math.floor(30 + (270 * currentProgress));
+            // 2. 동적 차징 유성 개수를 30개에서 900개까지 스케일링되도록 공식 상향 (30 + 870 * progress)
+            const activeChargingLimit = Math.floor(30 + (870 * currentProgress));
 
             chargingMeteors.forEach((meteor, index) => {
                 if (isHolding && index < activeChargingLimit) {
@@ -531,7 +528,6 @@
                         meteor.userData.active = true;
                     }
                     
-                    // 5. 버그 수정: 클릭 직후에도 유성이 선명하게 보이도록 투명도를 빠르게 0.8까지 올림
                     meteor.material.opacity = Math.min(meteor.material.opacity + 0.05, 0.8);
 
                     const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
