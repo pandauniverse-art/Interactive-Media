@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Dynamic Charge & Slow Meteor Burst</title>
+    <title>Deep Space - Fixed Charging Meteors (30 to 300)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -268,11 +268,13 @@
             burstParticles = new THREE.Points(burstGeom, burstParticlesMaterial);
             scene.add(burstParticles);
 
+            // 1. 기존 배경 유성우 (300개)
             createMeteors(300);
             
-            // 1. 최대 개수 기준인 200개로 차징 유성 배열 초기화 (기존 100개의 200%)
-            createChargingMeteors(200);
+            // 2. 최대 개수인 300개로 차징 유성(안으로 모임) 배열 초기화
+            createChargingMeteors(300);
 
+            // 3. 폭발 방사형 유성 (밖으로 퍼짐, 300개)
             createBurstMeteors(300);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -332,11 +334,16 @@
                 depthTest: false
             });
             for(let i = 0; i < count; i++) {
-                const meteor = new THREE.Mesh(geom, mat);
+                const meteor = new MeshWithData(geom, mat);
                 meteor.userData.active = false;
                 scene.add(meteor);
                 chargingMeteors.push(meteor);
             }
+        }
+
+        // 헬퍼 함수
+        function MeshWithData(geom, mat) {
+            return new THREE.Mesh(geom, mat);
         }
 
         function resetChargingMeteor(meteor, targetPos) {
@@ -354,7 +361,6 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             
             meteor.userData.direction = dir;
-            // 2. 모이는 속도 50% 수준으로 감속 (100~250 -> 50~125)
             meteor.userData.speed = 50 + Math.random() * 75; 
         }
 
@@ -473,7 +479,6 @@
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
                         
-                        // 3. 폭발 유성 속도를 10% 수준으로 극한 감속 (150~400 -> 15~40)
                         const speed = 15 + Math.random() * 25; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
@@ -516,8 +521,8 @@
 
             const mouseTarget3D = getMouse3DTarget();
             
-            // 4. 차징 진행률에 따라 화면에 나타나는 차징 유성의 개수를 30개(30%) ~ 200개(200%) 로 제한
-            const activeChargingLimit = Math.floor(30 + (170 * currentProgress));
+            // 4. 차징 유성 개수 동적 제어 (초기 30개에서 서서히 300개로 증가)
+            const activeChargingLimit = Math.floor(30 + (270 * currentProgress));
 
             chargingMeteors.forEach((meteor, index) => {
                 if (isHolding && index < activeChargingLimit) {
@@ -525,7 +530,9 @@
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
                     }
-                    meteor.material.opacity = Math.min(meteor.material.opacity + 0.05, 0.8 * currentProgress);
+                    
+                    // 5. 버그 수정: 클릭 직후에도 유성이 선명하게 보이도록 투명도를 빠르게 0.8까지 올림
+                    meteor.material.opacity = Math.min(meteor.material.opacity + 0.05, 0.8);
 
                     const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
                     meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
@@ -543,7 +550,6 @@
             });
 
             if (isBursting) {
-                // 5. 속도가 느려진 만큼 중간에 끊기지 않도록 페이드아웃 시간을 3.0초에서 6.0초로 연장
                 if (burstTime < 6.0) {
                     burstMeteorMaterial.opacity = 1.0 - (burstTime / 6.0);
                     burstMeteors.forEach(meteor => {
