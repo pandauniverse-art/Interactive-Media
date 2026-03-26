@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - 3s Flashbang & Supernova Burst</title>
+    <title>Deep Space - Dynamic Burst Intensity</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -204,13 +204,15 @@
 
     <script id="burstVertexShader" type="x-shader/x-vertex">
         uniform float uBurstTime;
+        uniform float uBurstPower; // 동적 폭발 강도 계수 추가
         uniform vec2 uBurstCenter;
         attribute vec3 aVelocity;
         attribute float aSize;
         varying float vBurstAlpha;
 
         void main() {
-            vec3 finalPos = position + aVelocity * uBurstTime * 400.0;
+            // 폭발 강도(uBurstPower)에 비례하여 파티클이 퍼지는 거리를 조절
+            vec3 finalPos = position + aVelocity * uBurstTime * 400.0 * uBurstPower;
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
             mvPosition.xy += uBurstCenter * 2000.0; 
 
@@ -399,7 +401,8 @@
             const particlesMat = new THREE.ShaderMaterial({
                 uniforms: {
                     uBurstTime: { value: 0.0 },
-                    uBurstCenter: { value: new THREE.Vector2(0, 0) }
+                    uBurstCenter: { value: new THREE.Vector2(0, 0) },
+                    uBurstPower: { value: 1.0 } // 쉐이더 강도 제어 유니폼
                 },
                 vertexShader: document.getElementById('burstVertexShader').textContent,
                 fragmentShader: document.getElementById('burstFragmentShader').textContent,
@@ -427,6 +430,7 @@
             for(let i = 0; i < maxBurstMeteors; i++) {
                 const meteor = new THREE.Mesh(meteorGeom, meteorMat);
                 meteor.scale.z = 0.001; 
+                meteor.visible = false; // 초기엔 비활성화
                 scene.add(meteor);
                 meteorsArr.push(meteor);
             }
@@ -525,8 +529,11 @@
                 isHolding = false; 
                 targetProgress = 0.0;
                 
-                if(currentProgress > 0.1) {
-                    explosionBrightness = Math.max(240.0, explosionBrightness * 2.0); 
+                if(currentProgress > 0.05) { // 아주 짧은 터치 보정
+                    // 1. 차징 시간에 비례한 동적 폭발 강도 (최소 5% ~ 최대 100%)
+                    let burstIntensity = Math.max(0.05, currentProgress);
+
+                    explosionBrightness = Math.max(240.0 * burstIntensity, explosionBrightness * 2.0); 
 
                     const burst = burstPool[currentBurstIndex];
                     currentBurstIndex = (currentBurstIndex + 1) % MAX_BURSTS; 
@@ -534,57 +541,62 @@
                     burst.active = true;
                     burst.time = 0.0;
                     
+                    // 미세 파티클 강도 설정
                     burst.particlesMesh.visible = true;
                     burst.particlesMat.uniforms.uBurstCenter.value.set(mouseX, mouseY);
+                    burst.particlesMat.uniforms.uBurstPower.value = Math.max(0.2, burstIntensity); 
 
-                    // 1. 번쩍이는 플래시 지속시간 3초로 연장
+                    // 플래시뱅 크기 연동
                     const flash = burst.flashDiv;
                     flash.style.transition = 'none';
-                    flash.style.transform = 'translate(-50%, -50%) scale(0.1)';
-                    flash.style.opacity = '1';
+                    flash.style.transform = `translate(-50%, -50%) scale(${Math.max(0.2, burstIntensity * 0.1)})`;
+                    flash.style.opacity = String(Math.min(1.0, burstIntensity * 1.5));
                     flash.style.left = lastHeldX + 'px';
                     flash.style.top = lastHeldY + 'px';
                     void flash.offsetWidth; 
                     flash.style.transition = 'transform 0.15s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 3.0s ease-out';
-                    flash.style.transform = 'translate(-50%, -50%) scale(1)';
+                    flash.style.transform = `translate(-50%, -50%) scale(${Math.max(0.5, burstIntensity)})`;
                     flash.style.opacity = '0';
 
+                    // 화염 이펙트 크기 연동
                     burst.burstDiv.style.transition = 'none';
                     burst.burstDiv.style.transform = 'translate(-50%, -50%) scale(0)';
                     burst.burstDiv.style.opacity = '1';
                     burst.burstDiv.style.left = lastHeldX + 'px';
                     burst.burstDiv.style.top = lastHeldY + 'px';
+                    burst.burstDiv.style.width = `calc(var(--max-size) * ${burstIntensity})`;
+                    burst.burstDiv.style.height = `calc(var(--max-size) * ${burstIntensity})`;
                     void burst.burstDiv.offsetWidth; 
                     burst.burstDiv.style.transition = 'width 0.8s ease-out, height 0.8s ease-out, transform 0.8s ease-out, opacity 0.8s ease-in';
-                    burst.burstDiv.style.width = 'var(--max-size)';
-                    burst.burstDiv.style.height = 'var(--max-size)';
                     burst.burstDiv.style.transform = 'translate(-50%, -50%) scale(1)';
                     burst.burstDiv.style.opacity = '0'; 
 
+                    // 메인 충격파 크기 연동
                     burst.shockwaveDiv.style.transition = 'none';
                     burst.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(0)';
                     burst.shockwaveDiv.style.opacity = '1';
                     burst.shockwaveDiv.style.left = lastHeldX + 'px';
                     burst.shockwaveDiv.style.top = lastHeldY + 'px';
+                    burst.shockwaveDiv.style.width = `calc(var(--max-size) * ${burstIntensity})`;
+                    burst.shockwaveDiv.style.height = `calc(var(--max-size) * ${burstIntensity})`;
                     void burst.shockwaveDiv.offsetWidth; 
                     burst.shockwaveDiv.style.transition = 'width 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), height 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), transform 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 15.0s ease-out';
-                    burst.shockwaveDiv.style.width = 'var(--max-size)';
-                    burst.shockwaveDiv.style.height = 'var(--max-size)';
                     burst.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(1)';
                     burst.shockwaveDiv.style.opacity = '0'; 
 
+                    // 서브(빠른) 충격파 크기 연동
                     const fastShockwave = burst.fastShockwaveDiv;
                     fastShockwave.style.transition = 'none';
                     fastShockwave.style.transform = 'translate(-50%, -50%) scale(0)';
                     fastShockwave.style.opacity = '1';
                     fastShockwave.style.left = lastHeldX + 'px';
                     fastShockwave.style.top = lastHeldY + 'px';
+                    fastShockwave.style.width = `calc(var(--max-size) * ${burstIntensity})`;
+                    fastShockwave.style.height = `calc(var(--max-size) * ${burstIntensity})`;
                     
                     setTimeout(() => {
                         void fastShockwave.offsetWidth;
                         fastShockwave.style.transition = 'width 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), height 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), transform 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 7.5s ease-out';
-                        fastShockwave.style.width = 'var(--max-size)';
-                        fastShockwave.style.height = 'var(--max-size)';
                         fastShockwave.style.transform = 'translate(-50%, -50%) scale(1)';
                         fastShockwave.style.opacity = '0';
                     }, 150);
@@ -592,25 +604,34 @@
                     const burstTarget3D = getMouse3DTarget();
                     burst.meteorMat.opacity = 1.0; 
 
-                    burst.meteors.forEach(meteor => {
-                        meteor.position.copy(burstTarget3D);
-                        meteor.scale.set(1, 1, 0.001); 
-                        
-                        const u = Math.random();
-                        const v = Math.random();
-                        const theta = u * 2.0 * Math.PI;
-                        const phi = Math.acos(2.0 * v - 1.0);
-                        
-                        const speed = 2.25 + Math.random() * 3.75; 
+                    // 2. 강도에 비례하여 유성 개수 제어 (최대 1800개)
+                    const activeMeteorCount = Math.floor(burst.meteors.length * burstIntensity);
 
-                        const vx = Math.sin(phi) * Math.cos(theta) * speed;
-                        const vy = Math.sin(phi) * Math.sin(theta) * speed;
-                        const vz = Math.cos(phi) * speed;
+                    burst.meteors.forEach((meteor, index) => {
+                        if (index < activeMeteorCount) {
+                            meteor.visible = true;
+                            meteor.position.copy(burstTarget3D);
+                            meteor.scale.set(1, 1, 0.001); 
+                            
+                            const u = Math.random();
+                            const v = Math.random();
+                            const theta = u * 2.0 * Math.PI;
+                            const phi = Math.acos(2.0 * v - 1.0);
+                            
+                            // 3. 유성이 뻗어나가는 속도도 폭발 강도에 비례 (최소 20% 속도는 보장)
+                            const baseSpeed = 2.25 + Math.random() * 3.75; 
+                            const speed = baseSpeed * Math.max(0.2, burstIntensity); 
 
-                        const vel = new THREE.Vector3(vx, vy, vz);
-                        meteor.userData.velocity = vel;
-                        
-                        meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), vel.clone().normalize());
+                            const vx = Math.sin(phi) * Math.cos(theta) * speed;
+                            const vy = Math.sin(phi) * Math.sin(theta) * speed;
+                            const vz = Math.cos(phi) * speed;
+
+                            const vel = new THREE.Vector3(vx, vy, vz);
+                            meteor.userData.velocity = vel;
+                            meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), vel.clone().normalize());
+                        } else {
+                            meteor.visible = false; // 차징이 부족하면 나머지는 그리지 않음
+                        }
                     });
                 }
             }
@@ -684,8 +705,10 @@
                     if (burst.time < 6.0) {
                         burst.meteorMat.opacity = 1.0 - (burst.time / 6.0);
                         burst.meteors.forEach(meteor => {
-                            meteor.scale.z = Math.min(1.0, meteor.scale.z + 0.03); 
-                            meteor.position.add(meteor.userData.velocity);
+                            if (meteor.visible) {
+                                meteor.scale.z = Math.min(1.0, meteor.scale.z + 0.03); 
+                                meteor.position.add(meteor.userData.velocity);
+                            }
                         });
                     }
 
