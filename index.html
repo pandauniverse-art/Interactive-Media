@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Supernova Burst (1800 Meteors)</title>
+    <title>Deep Space - Overcharged Core & 30% Speed Burst</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
@@ -30,8 +30,35 @@
             animation: spin 10s linear infinite;
         }
 
+        /* 1. 신규 덧댄 레이어 (처음엔 투명, 나중에 100% 밝기) */
+        #rayEffectOverlay {
+            position: fixed;
+            width: 0vmin; 
+            height: 0vmin;
+            --max-size: 12vmin;
+            transform: translate(-50%, -50%) scale(0); 
+            opacity: 0; /* 초기 투명도 0 */
+            pointer-events: none;
+            z-index: 101; /* rayEffect보다 위 */
+            mix-blend-mode: screen; 
+            
+            background: 
+                repeating-conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,1.0) 1deg, transparent 3deg, transparent 60deg),
+                radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,0.9) 40%, transparent 80%);
+            border-radius: 50%;
+            
+            filter: blur(4px); 
+            box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.7);
+            
+            /* 기존 코어와 반대 방향으로 회전시켜 이펙트 풍성도 극대화 */
+            animation: spin-reverse 8s linear infinite;
+        }
+
         @keyframes spin { 
             100% { transform: translate(-50%, -50%) rotate(360deg); } 
+        }
+        @keyframes spin-reverse { 
+            100% { transform: translate(-50%, -50%) rotate(-360deg); } 
         }
 
         #burstEffect {
@@ -42,7 +69,7 @@
             transform: translate(-50%, -50%) scale(0);
             opacity: 0;
             pointer-events: none;
-            z-index: 101; 
+            z-index: 102; 
             mix-blend-mode: screen; 
             background-image: url('image_1.png'); 
             background-size: contain;
@@ -59,7 +86,7 @@
             transform: translate(-50%, -50%) scale(0);
             opacity: 0;
             pointer-events: none;
-            z-index: 102; 
+            z-index: 103; 
             mix-blend-mode: overlay; 
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3); 
@@ -71,7 +98,7 @@
 </head>
 <body>
     <div id="rayEffect"></div>
-    <div id="burstEffect"></div>
+    <div id="rayEffectOverlay"></div> <div id="burstEffect"></div>
     <div id="shockwaveEffect"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -166,7 +193,7 @@
         let scene, camera, renderer;
         let bgParticlesMaterial, bgParticles;
         let burstParticlesMaterial, burstParticles;
-        let rayEffect, burstEffect, shockwaveEffect; 
+        let rayEffect, rayEffectOverlay, burstEffect, shockwaveEffect; 
         
         let mouseX = 0, mouseY = 0;
         
@@ -197,6 +224,7 @@
 
         function init() {
             rayEffect = document.getElementById('rayEffect');
+            rayEffectOverlay = document.getElementById('rayEffectOverlay'); // 오버레이 요소 가져오기
             burstEffect = document.getElementById('burstEffect');
             shockwaveEffect = document.getElementById('shockwaveEffect');
 
@@ -269,11 +297,7 @@
             scene.add(burstParticles);
 
             createMeteors(300);
-            
-            // 차징 유성 (안으로 모임) 400개
             createChargingMeteors(400);
-
-            // 1. 폭발 유성 개수 300개 -> 1800개로 상향 (기존 대비 6배, 마지막 요청 기준 2배)
             createBurstMeteors(1800);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -323,7 +347,6 @@
         }
 
         function createChargingMeteors(count) {
-            // 차징 유성(선) 20% 두께로 얇게 조절
             const geom = new THREE.CylinderGeometry(0.8, 0.1, 1500, 3); 
             geom.rotateX(Math.PI / 2); 
             
@@ -482,8 +505,8 @@
                         const theta = u * 2.0 * Math.PI;
                         const phi = Math.acos(2.0 * v - 1.0);
                         
-                        // 2. 폭발 유성 속도 현재 기준 50% 추가 감속 (15~40 -> 7.5~20)
-                        const speed = 7.5 + Math.random() * 12.5; 
+                        // 2. 폭발 유성 속도 기존(7.5~20) 대비 30% 수준으로 극한 감속 (2.25 ~ 6.0)
+                        const speed = 2.25 + Math.random() * 3.75; 
 
                         const vx = Math.sin(phi) * Math.cos(theta) * speed;
                         const vy = Math.sin(phi) * Math.sin(theta) * speed;
@@ -532,11 +555,9 @@
                     if (!meteor.userData.active) {
                         resetChargingMeteor(meteor, mouseTarget3D);
                         meteor.userData.active = true;
-                        // 투명도 20%로 부드럽게 시작
                         meteor.material.opacity = 0.2; 
                     }
                     
-                    // 시작 투명도 20%에서 100%까지 상승 애니메이션
                     if(meteor.material.opacity < 1.0) {
                         meteor.material.opacity = Math.min(1.0, meteor.material.opacity + 0.02);
                     }
@@ -572,6 +593,9 @@
             rayEffect.style.width = `calc(var(--max-size) * ${currentProgress})`;
             rayEffect.style.height = `calc(var(--max-size) * ${currentProgress})`;
             
+            rayEffectOverlay.style.width = `calc(var(--max-size) * ${currentProgress})`;
+            rayEffectOverlay.style.height = `calc(var(--max-size) * ${currentProgress})`;
+
             rayScale = currentProgress; 
             rayOpacity = currentProgress; 
 
@@ -597,12 +621,21 @@
             rayEffect.style.left = lastHeldX + 'px';
             rayEffect.style.top = lastHeldY + 'px';
             
+            rayEffectOverlay.style.left = lastHeldX + 'px';
+            rayEffectOverlay.style.top = lastHeldY + 'px';
+
             if (rayScale > 0.01) {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
                 rayEffect.style.opacity = rayOpacity;
                 rayEffect.style.filter = `blur(2px) brightness(${explosionBrightness})`; 
+                
+                // 3. 신규 덧댄 레이어 투명도 0 -> 100% 처리
+                rayEffectOverlay.style.transform = `translate(-50%, -50%) scale(${rayScale})`;
+                rayEffectOverlay.style.opacity = currentProgress; // 0에서 1.0(100%)까지 점진적 상승
+                rayEffectOverlay.style.filter = `blur(4px) brightness(${explosionBrightness * 1.5})`; 
             } else {
                 rayEffect.style.transform = `translate(-50%, -50%) scale(0)`;
+                rayEffectOverlay.style.transform = `translate(-50%, -50%) scale(0)`;
             }
 
             renderer.render(scene, camera);
