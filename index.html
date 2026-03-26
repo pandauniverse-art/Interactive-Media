@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Smooth Condense & Ultimate Supernova</title>
+    <title>Deep Space - 6s Expand & 3s Blackhole Condense</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
-        /* 레이어 1: 가장 넓고 은은하게 퍼지는 후광 (24vmin) */
         #rayEffectGlow {
             position: fixed;
             width: 24vmin; 
@@ -27,7 +26,6 @@
             will-change: transform, opacity;
         }
 
-        /* 레이어 2: 중심을 잡아주는 베이스 코어 (12vmin) */
         #rayEffect {
             position: fixed;
             width: 12vmin; 
@@ -46,7 +44,6 @@
             will-change: transform, opacity;
         }
 
-        /* 레이어 3: 밝게 타오르는 오버레이 (12vmin) */
         #rayEffectOverlay {
             position: fixed;
             width: 12vmin; 
@@ -65,7 +62,6 @@
             will-change: transform, opacity, box-shadow;
         }
 
-        /* 레이어 4: 10초 이후 나타나는 초고밀도 에너지 압축 레이어 (14vmin) */
         #rayEffectCondensed {
             position: fixed;
             width: 14vmin; 
@@ -266,10 +262,8 @@
         let currentProgress = 0.0; 
         let explosionBrightness = 2.0; 
 
-        // 시간에 따른 정밀 제어 변수
         let holdTime = 0.0; 
         let lastFrameTime = performance.now();
-        // 각 레이어 회전 각도 독립 계산 (덮어쓰기 방지)
         let rotAngle1 = 0;
         let rotAngle2 = 0;
 
@@ -281,8 +275,10 @@
         
         const meteors = [];         
         const chargingMeteors = []; 
+        const condenseMeteors = []; // 신규: 블랙홀 흡수용 파티클/유성 배열
         
         const maxChargingMeteors = Math.floor(400 * Q_MULT);
+        const maxCondenseMeteors = Math.floor(800 * Q_MULT); // 신규: 800개의 강력한 흡수 파티클
         const maxBurstMeteors = Math.floor(1800 * Q_MULT);
         const startChargingMeteors = Math.floor(50 * Q_MULT);
         const chargingMeteorRange = maxChargingMeteors - startChargingMeteors;
@@ -349,6 +345,7 @@
 
             createMeteors(Math.floor(300 * Q_MULT));
             createChargingMeteors(maxChargingMeteors);
+            createCondenseMeteors(maxCondenseMeteors); // 신규 블랙홀 입자 생성
 
             for(let i = 0; i < MAX_BURSTS; i++) {
                 createBurstInstance();
@@ -499,6 +496,26 @@
             }
         }
 
+        // 1. 신규 블랙홀 흡수용 입자(파티클+유성 혼합) 생성 함수
+        function createCondenseMeteors(count) {
+            for(let i = 0; i < count; i++) {
+                // 50% 확률로 짧고 굵은 파티클(점), 50% 확률로 긴 유성(선)
+                let isParticle = Math.random() > 0.5;
+                let length = isParticle ? 50 : 2000;
+                let radius = isParticle ? 4.0 : 1.2;
+                
+                const geom = new THREE.CylinderGeometry(radius, radius*0.2, length, 3); 
+                geom.rotateX(Math.PI / 2); 
+                
+                let color = Math.random() > 0.5 ? 0xffffff : 0x88ddff; // 흰색과 청록색 믹스
+                const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthTest: false });
+                const meteor = new THREE.Mesh(geom, mat);
+                meteor.userData.active = false;
+                scene.add(meteor);
+                condenseMeteors.push(meteor);
+            }
+        }
+
         function resetChargingMeteor(meteor, targetPos) {
             const theta = Math.random() * Math.PI * 2;
             const radius = 3500 + Math.random() * 2000; 
@@ -508,6 +525,20 @@
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
             meteor.userData.direction = dir;
             meteor.userData.speed = 40 + Math.random() * 60; 
+        }
+
+        // 흡수 입자 리셋 (거리가 더 멀고 속도가 엄청나게 빠름)
+        function resetCondenseMeteor(meteor, targetPos) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2.0 * Math.random() - 1.0); // 구면 좌표계로 360도 사방에서 스폰
+            const radius = 4000 + Math.random() * 3000; 
+            
+            meteor.position.set(
+                targetPos.x + Math.sin(phi) * Math.cos(theta) * radius,
+                targetPos.y + Math.sin(phi) * Math.sin(theta) * radius,
+                targetPos.z + Math.cos(phi) * radius
+            );
+            meteor.userData.speed = 150 + Math.random() * 200; // 빨려 들어가는 맹렬한 속도
         }
 
         function getMouse3DTarget() {
@@ -551,8 +582,8 @@
                 targetProgress = 0.0;
                 
                 if(currentProgress > 0.05) { 
-                    // 10초 이후 응축 진행도를 바탕으로 폭발 강도 증폭 (최대 2.5배)
-                    let condenseProgress = Math.max(0.0, Math.min(1.0, (holdTime - 10.0) / 5.0));
+                    // 2. 폭발 타이밍 계산 수정 (6초 이후의 응축량을 3초로 나눔)
+                    let condenseProgress = Math.max(0.0, Math.min(1.0, (holdTime - 6.0) / 3.0));
                     let burstIntensity = Math.max(0.05, currentProgress) + condenseProgress * 1.5; 
 
                     explosionBrightness = Math.max(240.0 * burstIntensity, explosionBrightness * 2.0); 
@@ -678,7 +709,6 @@
                 holdTime += dt;
             }
 
-            // JS에서 부드러운 회전 각도를 계산하여 CSS 충돌 방지
             rotAngle1 += 30 * dt; 
             rotAngle2 -= 45 * dt;
 
@@ -688,30 +718,28 @@
             let distance = (1000 - camera.position.z) / dir.z; 
             let finalPos = camera.position.clone().add(dir.multiplyScalar(distance)); 
             
-            // --- 컷 전환 방지: 매끄러운 글리치 및 응축 로직 ---
+            // 3. 타이밍 6초 + 3초 (총 9초) 기준 글리치 및 응축 로직 업데이트
             let isGlitching = false;
             let glitchIntensity = 0.0;
             let shake = 0.0;
             
-            // 응축 진행률 (0.0 ~ 1.0)
+            // 응축 진행률 (6초 ~ 9초 구간, 최대 3초 동안 0.0 ~ 1.0)
             let condenseProgressRaw = 0.0;
-            if (isHolding && holdTime > 10.0) {
-                condenseProgressRaw = Math.min(1.0, (holdTime - 10.0) / 5.0);
+            if (isHolding && holdTime > 6.0) {
+                condenseProgressRaw = Math.min(1.0, (holdTime - 6.0) / 3.0);
             }
             
-            // 뚝 끊기지 않도록 부드러운 곡선(Ease-in-out) 적용
             let smoothCondense = condenseProgressRaw * condenseProgressRaw * (3 - 2 * condenseProgressRaw);
-            
-            // 각자의 원래 크기에서 최대 60%까지 부드럽게 감소 (1.0 -> 0.6)
             let scaleMultiplier = 1.0 - (0.4 * smoothCondense);
 
             if (isHolding) {
-                if (holdTime > 8.0 && holdTime <= 10.0) {
+                // 4.8초(80%)부터 잔진동 글리치 시작, 6초부터 극한 진동
+                if (holdTime > 4.8 && holdTime <= 6.0) {
                     isGlitching = true;
-                    glitchIntensity = (holdTime - 8.0) / 2.0; // 0.0 -> 1.0 자연스럽게 상승
-                } else if (holdTime > 10.0) {
+                    glitchIntensity = (holdTime - 4.8) / 1.2; 
+                } else if (holdTime > 6.0) {
                     isGlitching = true;
-                    glitchIntensity = 1.0 + smoothCondense; // 1.0 -> 2.0 상승
+                    glitchIntensity = 1.0 + smoothCondense; 
                 }
             }
 
@@ -760,7 +788,6 @@
                     const dirCharging = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
                     meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirCharging);
                     
-                    // 응축 단계(10초 이후)에서는 모여드는 속도도 더욱 가속됨
                     let speedMult = 1.0 + (smoothCondense * 3.0);
                     meteor.position.add(dirCharging.multiplyScalar(meteor.userData.speed * speedMult));
 
@@ -772,6 +799,36 @@
                     if (meteor.material.opacity <= 0) {
                         meteor.userData.active = false;
                     }
+                }
+            });
+
+            // 4. 신규 블랙홀 흡수 파티클 처리 (6초 이후부터 스폰되어 엄청난 속도로 빨려 들어감)
+            condenseMeteors.forEach((meteor, index) => {
+                if (isHolding && smoothCondense > 0.0) {
+                    let activeCount = Math.floor(maxCondenseMeteors * smoothCondense);
+                    if (index < activeCount) {
+                        if (!meteor.userData.active) {
+                            resetCondenseMeteor(meteor, mouseTarget3D);
+                            meteor.userData.active = true;
+                            meteor.material.opacity = 0.0;
+                        }
+                        meteor.material.opacity = Math.min(1.0, meteor.material.opacity + 0.05);
+                        
+                        const dir = new THREE.Vector3().subVectors(mouseTarget3D, meteor.position).normalize();
+                        meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+                        // 매우 빠른 속도로 중앙으로 이동
+                        meteor.position.add(dir.multiplyScalar(meteor.userData.speed));
+
+                        if (meteor.position.distanceTo(mouseTarget3D) < 300) {
+                            resetCondenseMeteor(meteor, mouseTarget3D);
+                        }
+                    } else {
+                        meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
+                        if (meteor.material.opacity <= 0) meteor.userData.active = false;
+                    }
+                } else {
+                    meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
+                    if (meteor.material.opacity <= 0) meteor.userData.active = false;
                 }
             });
 
@@ -800,7 +857,6 @@
             let easing = isHolding ? 0.005 : 0.02; 
             currentProgress += (targetProgress - currentProgress) * easing;
             
-            // 매끄럽게 연결된 최종 스케일 계산 (폭발적인 컷 전환 방지)
             let finalScale = currentProgress * scaleMultiplier;
 
             bgParticlesMaterial.uniforms.uGatherProgress.value = currentProgress;
@@ -825,7 +881,6 @@
             rayEffectCondensed.style.top = lastHeldY + 'px';
 
             if (finalScale > 0.01) {
-                // width 속성 제거 후 transform scale 만을 이용하여 개별 비율 유지 및 부드러운 스케일링
                 rayEffectGlow.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 0.5}deg)`;
                 rayEffectGlow.style.opacity = currentProgress; 
                 rayEffectGlow.style.filter = `blur(16px) brightness(${explosionBrightness})`; 
@@ -838,7 +893,6 @@
                 rayEffectOverlay.style.opacity = currentProgress; 
                 rayEffectOverlay.style.filter = `blur(4px) brightness(${explosionBrightness * 1.5})`; 
 
-                // 신규 초고밀도 에너지 레이어 (10~15초 사이 투명도 서서히 차오름)
                 rayEffectCondensed.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 2.0}deg)`;
                 rayEffectCondensed.style.opacity = smoothCondense; 
                 rayEffectCondensed.style.filter = `blur(${2 + smoothCondense * 2}px) brightness(${explosionBrightness * 2.0})`;
