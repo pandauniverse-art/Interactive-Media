@@ -67,7 +67,7 @@
             filter: blur(10px) brightness(3.0); 
         }
         
-        /* 신규: 6초 이후 안으로 강력하게 빨려 들어오는 초대형 공간 파장 */
+        /* 신규: 6초 이후 안으로 강력하게 빨려 들어오는 초대형 에너지파 */
         .rev-shockwave { 
             width: 100vmin; height: 100vmin; z-index: 107; border-radius: 50%; mix-blend-mode: overlay;
             border: 6px solid rgba(200, 240, 255, 0.5); box-shadow: inset 0 0 100px 20px rgba(100, 200, 255, 0.3);
@@ -168,6 +168,7 @@
     </script>
 
     <script>
+        // 에러를 화면에 표시하는 헬퍼 함수
         window.onerror = function(msg, url, line) {
             var errDiv = document.getElementById('error-log');
             errDiv.style.display = 'block';
@@ -175,38 +176,47 @@
             return false;
         };
 
+        // 모바일 최적화 및 변수 선언부
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
         const Q_MULT = isMobile ? 0.33 : 1.0; 
 
+        // 오디오 에러(404)를 무시하는 안전한 실행 함수
         function safeAudioPlay(audio, volume) {
             if (audio) {
                 audio.volume = volume || 1.0;
                 audio.currentTime = 0;
                 var promise = audio.play();
-                if (promise !== undefined) { promise.catch(function(e) {}); }
+                if (promise !== undefined) {
+                    promise.catch(function(e) {});
+                }
             }
         }
         function safeAudioPause(audio) {
-            if (audio) { audio.pause(); audio.currentTime = 0; }
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
         }
 
         let chargeAudio = new Audio('charge.mp3'); chargeAudio.loop = true;
         let glitchAudio = new Audio('glitch.mp3'); glitchAudio.loop = true;
 
         let scene, camera, renderer, mouseGlow;
-        let bgParticlesMaterial;
-        let rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed;
+        let bgParticlesMaterial, rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed;
         let fadeScene, fadeCamera, fadePlane; 
         
         let mouseX = 0, mouseY = 0;
         let isHolding = false;
         let lastHeldX = window.innerWidth / 2, lastHeldY = window.innerHeight / 2;
+        
         let targetProgress = 0.0, currentProgress = 0.0, explosionBrightness = 2.0; 
 
+        // 타이머 및 상태 변수
         let holdTime = 0.0, lastFrameTime = performance.now();
         let rotAngle1 = 0, rotAngle2 = 0;
         let uBlackoutValue = 0.0;
         
+        // 기폭(Implosion) 변수
         let isCollapsing = false;
         let collapseTime = 0.0;
         const COLLAPSE_DURATION = 0.15; // 응축 시간
@@ -227,7 +237,7 @@
         const BURST_PARTICLE_COUNT = Math.floor(80000 * Q_MULT); 
         const maxChargingMeteors = Math.floor(400 * Q_MULT);
         const maxCondenseMeteors = Math.floor(800 * Q_MULT); 
-        const maxBurstMeteors = Math.floor(2700 * Q_MULT); 
+        const maxBurstMeteors = Math.floor(2700 * Q_MULT); // 150% 증폭 유성 개수
         const startChargingMeteors = Math.floor(50 * Q_MULT);
         const chargingMeteorRange = maxChargingMeteors - startChargingMeteors;
         const SPACE_RANGE = 10000;
@@ -298,7 +308,6 @@
             bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
             scene.add(bgParticles);
 
-            // 기본 유성우
             const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
             meteorGeometry.rotateX(Math.PI / 2); 
             const meteorMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthTest: false });
@@ -307,7 +316,6 @@
                 resetMeteor(m); scene.add(m); meteors.push(m);
             }
 
-            // 차징 파티클
             const chargingGeom = new THREE.CylinderGeometry(0.8, 0.1, 1500, 3); 
             chargingGeom.rotateX(Math.PI / 2); 
             const chargingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthTest: false });
@@ -316,7 +324,6 @@
                 m.userData.active = false; scene.add(m); chargingMeteors.push(m);
             }
 
-            // 블랙홀 흡수 파티클
             for(let i = 0; i < maxCondenseMeteors; i++) {
                 let isParticle = Math.random() > 0.5;
                 const cGeom = new THREE.CylinderGeometry(isParticle ? 4.0 : 1.2, isParticle ? 0.8 : 0.24, isParticle ? 50 : 2000, 3); 
@@ -326,7 +333,6 @@
                 m.userData.active = false; scene.add(m); condenseMeteors.push(m);
             }
 
-            // 폭발 풀(Pool) 생성
             for(let i = 0; i < MAX_BURSTS; i++) {
                 const burstDiv = document.createElement('div'); burstDiv.className = 'burst-effect'; document.body.appendChild(burstDiv);
                 const shockwaveDiv = document.createElement('div'); shockwaveDiv.className = 'shockwave-effect'; document.body.appendChild(shockwaveDiv);
@@ -356,12 +362,9 @@
                     uniforms: { uBurstTime: { value: 0.0 }, uBurstCenter: { value: new THREE.Vector2(0, 0) }, uBurstPower: { value: 1.0 } },
                     vertexShader: document.getElementById('burstVertexShader').textContent,
                     fragmentShader: document.getElementById('burstFragmentShader').textContent,
-                    blending: THREE.AdditiveBlending, depthTest: false, transparent: true
+                    blending: THREE.AdditiveBlending, depthTest: false, transparent: true, visible: false 
                 });
-                
-                const particlesMesh = new THREE.Points(burstGeom, particlesMat); 
-                particlesMesh.visible = false;
-                scene.add(particlesMesh);
+                const particlesMesh = new THREE.Points(burstGeom, particlesMat); scene.add(particlesMesh);
 
                 const burstMeteorGeom = new THREE.CylinderGeometry(2, 0.2, 1200, 3);
                 burstMeteorGeom.rotateX(Math.PI / 2); burstMeteorGeom.translate(0, 0, 600); 
@@ -382,12 +385,10 @@
                 });
             }
 
-            // 마우스 광원 
             const glowMat = new THREE.SpriteMaterial({ map: createGlowTexture(), color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthTest: false });
             mouseGlow = new THREE.Sprite(glowMat);
             mouseGlow.scale.set(150, 150, 1); scene.add(mouseGlow);
 
-            // 잔상 이펙트용 보조 씬
             fadeScene = new THREE.Scene();
             fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
             fadeCamera.position.z = 1;
@@ -402,14 +403,11 @@
             document.body.appendChild(renderer.domElement);
 
             document.addEventListener('mousemove', onMouseMove);
-            
-            // --- 마우스 및 터치 이벤트 함수 활성화 ---
             document.addEventListener('mousedown', onMouseDown); 
             document.addEventListener('mouseup', triggerHoldEnd); 
             document.addEventListener('touchstart', onTouchStart, { passive: false });
             document.addEventListener('touchmove', onTouchMove, { passive: false });
             document.addEventListener('touchend', triggerHoldEnd, { passive: false }); 
-            
             window.addEventListener('resize', onWindowResize);
         }
 
@@ -420,28 +418,22 @@
         }
 
         function resetChargingMeteor(meteor, targetPos) {
-            const theta = Math.random() * Math.PI * 2;
-            const radius = 3500 + Math.random() * 2000;
-            const zDist = (Math.random() - 0.5) * 4000;
+            const theta = Math.random() * Math.PI * 2, radius = 3500 + Math.random() * 2000, zDist = (Math.random() - 0.5) * 4000;
             meteor.position.set(targetPos.x + Math.cos(theta) * radius, targetPos.y + Math.sin(theta) * radius, targetPos.z + zDist);
             const dir = new THREE.Vector3().subVectors(targetPos, meteor.position).normalize();
             meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-            meteor.userData.direction = dir; 
-            meteor.userData.speed = 40 + Math.random() * 60; 
+            meteor.userData.direction = dir; meteor.userData.speed = 40 + Math.random() * 60; 
         }
 
         function resetCondenseMeteor(meteor, targetPos) {
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2.0 * Math.random() - 1.0);
-            const radius = 4000 + Math.random() * 3000; 
+            const theta = Math.random() * Math.PI * 2, phi = Math.acos(2.0 * Math.random() - 1.0), radius = 4000 + Math.random() * 3000; 
             meteor.position.set(targetPos.x + Math.sin(phi) * Math.cos(theta) * radius, targetPos.y + Math.sin(phi) * Math.sin(theta) * radius, targetPos.z + Math.cos(phi) * radius);
             // 묵직한 흡수 속도 적용
             meteor.userData.speed = (150 + Math.random() * 200) * (0.4 + Math.random() * 0.1); 
         }
 
         function getMouse3DTarget() {
-            let vec = new THREE.Vector3(mouseX, mouseY, 0.5); 
-            vec.unproject(camera);
+            let vec = new THREE.Vector3(mouseX, mouseY, 0.5); vec.unproject(camera);
             let dir = vec.sub(camera.position).normalize();
             return camera.position.clone().add(dir.multiplyScalar((1000 - camera.position.z) / dir.z));
         }
@@ -453,41 +445,16 @@
         }
 
         function onMouseMove(event) { 
-            if(isHolding) { 
-                lastHeldX = event.clientX; lastHeldY = event.clientY; 
-            }
+            if(isHolding) { lastHeldX = event.clientX; lastHeldY = event.clientY; }
             updateExplosionCenter(event.clientX, event.clientY); 
         }
-        
-        // 마우스 클릭 이벤트 함수
-        function onMouseDown(event) {
-            triggerHoldStart(event.clientX, event.clientY);
-        }
-
-        function onTouchMove(event) { 
-            if (event.touches.length > 0) {
-                const touch = event.touches[0];
-                if(isHolding) { 
-                    lastHeldX = touch.clientX; lastHeldY = touch.clientY; 
-                }
-                updateExplosionCenter(touch.clientX, touch.clientY); 
-            }
-        }
-
-        // 터치 시작 이벤트 함수
-        function onTouchStart(event) {
-            if (event.touches.length > 0) {
-                event.preventDefault();
-                triggerHoldStart(event.touches[0].clientX, event.touches[0].clientY);
-                updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY);
-            }
-        }
+        function onMouseDown(event) { triggerHoldStart(event.clientX, event.clientY); }
+        function onTouchMove(event) { if (event.touches.length > 0) { const touch = event.touches[0]; if(isHolding) { lastHeldX = touch.clientX; lastHeldY = touch.clientY; } updateExplosionCenter(touch.clientX, touch.clientY); } }
+        function onTouchStart(event) { if (event.touches.length > 0) { event.preventDefault(); triggerHoldStart(event.touches[0].clientX, event.touches[0].clientY); updateExplosionCenter(event.touches[0].clientX, event.touches[0].clientY); } }
 
         function triggerHoldStart(clientX, clientY) {
             if (isCollapsing) return; 
-            isHolding = true; 
-            targetProgress = 1.0; 
-            holdTime = 0.0; 
+            isHolding = true; targetProgress = 1.0; holdTime = 0.0; 
             lastHeldX = clientX; lastHeldY = clientY;
             updateExplosionCenter(clientX, clientY);
             safeAudioPlay(chargeAudio, 1.0);
@@ -529,36 +496,41 @@
             b.particlesMat.uniforms.uBurstPower.value = Math.max(0.2, vInt); 
             b.meteorMat.opacity = 1.0; 
 
+            const reflow = (el) => void el.offsetWidth;
+
+            // 플래시뱅
             const flash = b.flashDiv;
-            flash.style.transition = 'none'; 
-            flash.style.transform = `translate(-50%, -50%) scale(${vInt * 0.1})`;
+            flash.style.transition = 'none'; flash.style.transform = `translate(-50%, -50%) scale(${vInt * 0.1})`;
             flash.style.opacity = String(Math.min(1.0, vInt * 1.5));
             flash.style.left = lastHeldX + 'px'; flash.style.top = lastHeldY + 'px';
-            void flash.offsetWidth; 
+            reflow(flash); 
             flash.style.transition = 'transform 0.15s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 3.0s ease-out';
             flash.style.transform = `translate(-50%, -50%) scale(${Math.max(0.5, vInt)})`;
             flash.style.opacity = '0';
 
+            // 화염 베이스
             b.burstDiv.style.transition = 'none'; b.burstDiv.style.transform = 'translate(-50%, -50%) scale(0)';
             b.burstDiv.style.opacity = '1'; b.burstDiv.style.left = lastHeldX + 'px'; b.burstDiv.style.top = lastHeldY + 'px';
             b.burstDiv.style.width = `calc(var(--max-size) * ${vInt})`; b.burstDiv.style.height = `calc(var(--max-size) * ${vInt})`;
-            void b.burstDiv.offsetWidth; 
+            reflow(b.burstDiv); 
             b.burstDiv.style.transition = 'width 0.8s ease-out, height 0.8s ease-out, transform 0.8s ease-out, opacity 0.8s ease-in';
             b.burstDiv.style.transform = 'translate(-50%, -50%) scale(1)'; b.burstDiv.style.opacity = '0'; 
 
+            // 메인 공기 파장
             b.shockwaveDiv.style.transition = 'none'; b.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(0)';
             b.shockwaveDiv.style.opacity = '1'; b.shockwaveDiv.style.left = lastHeldX + 'px'; b.shockwaveDiv.style.top = lastHeldY + 'px';
             b.shockwaveDiv.style.width = `calc(var(--max-size) * ${vInt})`; b.shockwaveDiv.style.height = `calc(var(--max-size) * ${vInt})`;
-            void b.shockwaveDiv.offsetWidth; 
+            reflow(b.shockwaveDiv); 
             b.shockwaveDiv.style.transition = 'width 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), height 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), transform 15.0s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 15.0s ease-out';
             b.shockwaveDiv.style.transform = 'translate(-50%, -50%) scale(1)'; b.shockwaveDiv.style.opacity = '0'; 
 
+            // 빠른 서브 파장
             const fastShock = b.fastShockwaveDiv;
             fastShock.style.transition = 'none'; fastShock.style.transform = 'translate(-50%, -50%) scale(0)';
             fastShock.style.opacity = '1'; fastShock.style.left = lastHeldX + 'px'; fastShock.style.top = lastHeldY + 'px';
             fastShock.style.width = `calc(var(--max-size) * ${vInt})`; fastShock.style.height = `calc(var(--max-size) * ${vInt})`;
-            setTimeout(function() {
-                void fastShock.offsetWidth;
+            setTimeout(() => {
+                reflow(fastShock);
                 fastShock.style.transition = 'width 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), height 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), transform 7.5s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 7.5s ease-out';
                 fastShock.style.transform = 'translate(-50%, -50%) scale(1)'; fastShock.style.opacity = '0';
             }, 150);
@@ -566,12 +538,12 @@
             const m3d = getMouse3DTarget();
             const activeMeteorCount = Math.min(b.meteors.length, Math.floor(maxBurstMeteors * vInt)); 
 
-            b.meteors.forEach(function(meteor, index) {
+            b.meteors.forEach((meteor, index) => {
                 if (index < activeMeteorCount) {
                     meteor.visible = true; meteor.position.copy(m3d); meteor.scale.set(1, 1, 0.001); 
                     
-                    const u = Math.random(); const v = Math.random();
-                    const theta = u * 2.0 * Math.PI; const phi = Math.acos(2.0 * v - 1.0);
+                    const u = Math.random(), v = Math.random();
+                    const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
                     const baseSpeed = 2.25 + Math.random() * 3.75; 
                     const speed = baseSpeed * Math.max(0.2, vInt); 
 
@@ -588,14 +560,12 @@
         }
 
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight; 
-            camera.updateProjectionMatrix(); 
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         // --- 메인 렌더링 루프 ---
         function animate(time) {
-            if (time === undefined) time = performance.now();
+            time = time || performance.now(); // 시간 예외 처리 추가
             requestAnimationFrame(animate);
 
             let dt = (time - lastFrameTime) / 1000.0;
@@ -632,7 +602,6 @@
                     // 핵심 연출: 중심점으로 급속 압축 (Ease-in, 강력한 흡수감)
                     rw.style.transition = 'transform 0.6s cubic-bezier(0.5, 0, 1, 1), opacity 0.6s ease-out';
                     rw.style.transform = 'translate(-50%, -50%) scale(0)'; 
-                    // 응축될수록 파장이 더 진해짐
                     rw.style.opacity = String(0.3 + smoothCondense * 0.5); 
                 }
             }
@@ -690,21 +659,19 @@
             
             mouseGlow.position.copy(m3d); 
 
-            meteors.forEach(function(meteor) {
+            meteors.forEach(meteor => {
                 meteor.position.add(meteor.userData.velocity);
-                if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) {
-                    resetMeteor(meteor);
-                }
+                if(meteor.position.z > camera.position.z + 1000 || Math.abs(meteor.position.x) > 6000 || Math.abs(meteor.position.y) > 6000) resetMeteor(meteor);
             });
 
             const activeChargingLimit = Math.floor(startChargingMeteors + (chargingMeteorRange * currentProgress));
 
-            chargingMeteors.forEach(function(meteor, index) {
+            chargingMeteors.forEach((meteor, index) => {
                 if ((isHolding || isCollapsing) && index < activeChargingLimit) {
                     if (!meteor.userData.active) {
                         resetChargingMeteor(meteor, m3d); meteor.userData.active = true; meteor.material.opacity = 0.2 * globalAlpha; 
                     }
-                    if(meteor.material.opacity < 1.0 * globalAlpha) { meteor.material.opacity = Math.min(1.0 * globalAlpha, meteor.material.opacity + 0.02); }
+                    if(meteor.material.opacity < 1.0 * globalAlpha) meteor.material.opacity = Math.min(1.0 * globalAlpha, meteor.material.opacity + 0.02);
                     const dirCharging = new THREE.Vector3().subVectors(m3d, meteor.position).normalize();
                     meteor.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirCharging);
                     
@@ -712,14 +679,14 @@
                     if (isCollapsing) speedMult *= 3.0; 
                     meteor.position.add(dirCharging.multiplyScalar(meteor.userData.speed * speedMult));
 
-                    if (meteor.position.distanceTo(m3d) < 200) { resetChargingMeteor(meteor, m3d); }
+                    if (meteor.position.distanceTo(m3d) < 200) resetChargingMeteor(meteor, m3d);
                 } else {
                     meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
                     if (meteor.material.opacity <= 0) meteor.userData.active = false;
                 }
             });
 
-            condenseMeteors.forEach(function(meteor, index) {
+            condenseMeteors.forEach((meteor, index) => {
                 if ((isHolding && smoothCondense > 0.0) || isCollapsing) {
                     let activeCount = Math.floor(maxCondenseMeteors * (isCollapsing ? 1.0 : smoothCondense));
                     if (index < activeCount) {
@@ -735,7 +702,7 @@
                         if (isCollapsing) suckSpeed *= 3.0; 
                         meteor.position.add(dir.multiplyScalar(suckSpeed));
 
-                        if (meteor.position.distanceTo(m3d) < 300) { resetCondenseMeteor(meteor, m3d); }
+                        if (meteor.position.distanceTo(m3d) < 300) resetCondenseMeteor(meteor, m3d);
                     } else {
                         meteor.material.opacity = Math.max(meteor.material.opacity - 0.1, 0.0);
                         if (meteor.material.opacity <= 0) meteor.userData.active = false;
@@ -746,12 +713,12 @@
                 }
             });
 
-            burstPool.forEach(function(burst) {
+            burstPool.forEach(burst => {
                 if (burst.active) {
                     burst.time += 0.016; burst.particlesMat.uniforms.uBurstTime.value = burst.time;
                     if (burst.time < 6.0) {
                         burst.meteorMat.opacity = 1.0 - (burst.time / 6.0);
-                        burst.meteors.forEach(function(meteor) {
+                        burst.meteors.forEach(meteor => {
                             if (meteor.visible) {
                                 meteor.scale.z = Math.min(1.0, meteor.scale.z + 0.03); meteor.position.add(meteor.userData.velocity);
                             }
@@ -776,9 +743,7 @@
                 explosionBrightness = Math.max(2.0, explosionBrightness * 0.96);
             }
             
-            [rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed].forEach(function(el) { 
-                el.style.left = lastHeldX + 'px'; el.style.top = lastHeldY + 'px'; 
-            });
+            [rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed].forEach(el => { el.style.left = lastHeldX + 'px'; el.style.top = lastHeldY + 'px'; });
 
             if (finalScale > 0.01) {
                 rayEffectGlow.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 0.5}deg)`;
@@ -790,7 +755,7 @@
                 rayEffectCondensed.style.transform = `translate(-50%, -50%) scale(${finalScale}) rotate(${rotAngle1 * 2.0}deg)`;
                 rayEffectCondensed.style.opacity = isCollapsing ? 1.0 : smoothCondense * globalAlpha; rayEffectCondensed.style.filter = `blur(${2.0 + smoothCondense * 2.0}px) brightness(${explosionBrightness * 2.0})`;
             } else {
-                [rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed].forEach(function(el) { el.style.transform = 'translate(-50%, -50%) scale(0)'; });
+                [rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed].forEach(el => el.style.transform = 'translate(-50%, -50%) scale(0)');
             }
 
             renderer.clearDepth(); 
