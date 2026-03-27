@@ -3,30 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Deep Space - Inward Shockwave & Ultimate Burst</title>
+    <title>Deep Space - Inward Shockwave & 150% Supernova</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; touch-action: none; }
         canvas { display: block; }
         
         /* 코어 이펙트 레이어 */
         #rayEffectGlow, #rayEffect, #rayEffectOverlay, #rayEffectCondensed {
-            position: fixed; transform: translate(-50%, -50%) scale(0); opacity: 0; pointer-events: none; border-radius: 50%; will-change: transform, opacity, box-shadow;
+            position: fixed; 
+            transform: translate(-50%, -50%) scale(0); 
+            opacity: 0; 
+            pointer-events: none; 
+            border-radius: 50%; 
+            will-change: transform, opacity, box-shadow;
         }
-        #rayEffectGlow { width: 24vmin; height: 24vmin; z-index: 99; mix-blend-mode: screen; background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,0.9) 40%, transparent 80%); filter: blur(16px); box-shadow: 0 0 150px 80px rgba(100, 180, 255, 0.4); }
-        #rayEffect { width: 12vmin; height: 12vmin; z-index: 100; mix-blend-mode: screen; background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%); filter: blur(2px); box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5); }
-        #rayEffectOverlay { width: 12vmin; height: 12vmin; z-index: 101; mix-blend-mode: screen; background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,0.9) 40%, transparent 80%); filter: blur(4px); box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.7); }
-        #rayEffectCondensed { width: 14vmin; height: 14vmin; z-index: 102; mix-blend-mode: screen; background: radial-gradient(circle, #ffffff 10%, #dcf0ff 50%, transparent 80%); filter: blur(2px) brightness(3.0); box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.9), 0 0 200px 80px rgba(0, 170, 255, 0.6); }
+        #rayEffectGlow { 
+            width: 24vmin; height: 24vmin; z-index: 99; mix-blend-mode: screen; 
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,0.9) 40%, transparent 80%); 
+            filter: blur(16px); box-shadow: 0 0 150px 80px rgba(100, 180, 255, 0.4); 
+        }
+        #rayEffect { 
+            width: 12vmin; height: 12vmin; z-index: 100; mix-blend-mode: screen; 
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,200,255,0.8) 30%, transparent 70%); 
+            filter: blur(2px); box-shadow: 0 0 75px 30px rgba(100, 200, 255, 0.8), 0 0 150px 60px rgba(255, 255, 255, 0.5); 
+        }
+        #rayEffectOverlay { 
+            width: 12vmin; height: 12vmin; z-index: 101; mix-blend-mode: screen; 
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,0.9) 40%, transparent 80%); 
+            filter: blur(4px); box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.7); 
+        }
+        #rayEffectCondensed { 
+            width: 14vmin; height: 14vmin; z-index: 102; mix-blend-mode: screen; 
+            background: radial-gradient(circle, #ffffff 10%, #dcf0ff 50%, transparent 80%); 
+            filter: blur(2px) brightness(3.0); 
+            box-shadow: 0 0 100px 50px rgba(255, 255, 255, 0.9), 0 0 200px 80px rgba(0, 170, 255, 0.6); 
+        }
         
         /* 폭발 및 파장 레이어 */
         .burst-effect, .shockwave-effect, .fast-shockwave-effect, .flash-effect, .rev-shockwave {
-            position: fixed; transform: translate(-50%, -50%) scale(0); opacity: 0; pointer-events: none; mix-blend-mode: screen; will-change: transform, opacity, width, height;
+            position: fixed; 
+            transform: translate(-50%, -50%) scale(0); 
+            opacity: 0; 
+            pointer-events: none; 
+            mix-blend-mode: screen; 
+            will-change: transform, opacity, width, height;
         }
-        .burst-effect { z-index: 103; background-image: url('image_1.png'); background-size: contain; background-repeat: no-repeat; background-position: center; filter: brightness(2.0); }
-        .shockwave-effect { z-index: 104; mix-blend-mode: overlay; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); background: radial-gradient(circle, transparent 70%, rgba(255, 255, 255, 0.1) 80%, transparent 90%); box-shadow: 0 0 100px 20px rgba(255, 255, 255, 0.2); backdrop-filter: blur(6px) brightness(1.2); }
-        .fast-shockwave-effect { z-index: 105; mix-blend-mode: overlay; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 50px 10px rgba(255, 255, 255, 0.3); backdrop-filter: blur(2px) brightness(1.4); }
-        .flash-effect { width: 300vmin; height: 300vmin; z-index: 106; background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,1) 10%, rgba(100,180,255,0.5) 30%, transparent 70%); filter: blur(10px) brightness(3.0); }
+        .burst-effect { 
+            z-index: 103; --max-size: 40vmin; background-image: url('image_1.png'); 
+            background-size: contain; background-repeat: no-repeat; background-position: center; filter: brightness(2.0); 
+        }
+        .shockwave-effect { 
+            z-index: 104; --max-size: 150vmin; mix-blend-mode: overlay; border-radius: 50%; 
+            border: 2px solid rgba(255, 255, 255, 0.3); background: radial-gradient(circle, transparent 70%, rgba(255, 255, 255, 0.1) 80%, transparent 90%); 
+            box-shadow: 0 0 100px 20px rgba(255, 255, 255, 0.2); backdrop-filter: blur(6px) brightness(1.2); 
+        }
+        .fast-shockwave-effect { 
+            z-index: 105; --max-size: 150vmin; mix-blend-mode: overlay; border-radius: 50%; 
+            border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 0 50px 10px rgba(255, 255, 255, 0.3); backdrop-filter: blur(2px) brightness(1.4); 
+        }
+        .flash-effect { 
+            width: 300vmin; height: 300vmin; z-index: 106; 
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(200,240,255,1) 10%, rgba(100,180,255,0.5) 30%, transparent 70%); 
+            filter: blur(10px) brightness(3.0); 
+        }
         
-        /* 신규: 6초 이후 안으로 빨려 들어오는 공기 파장 */
+        /* 신규 추가: 밖에서 안으로 빨려 들어오는 역방향 공기 파장 */
         .rev-shockwave { 
             width: 100vmin; height: 100vmin; z-index: 107; border-radius: 50%; mix-blend-mode: overlay;
             border: 6px solid rgba(200, 240, 255, 0.5); box-shadow: inset 0 0 100px 20px rgba(100, 200, 255, 0.3);
@@ -50,6 +91,7 @@
         attribute float aSize;
         varying float vAlpha;
         varying vec3 vColor; 
+
         void main() {
             vec3 modPos = position;
             modPos.z = mod(position.z + uTime * 15.0 + 5000.0, 10000.0) - 5000.0;
@@ -65,7 +107,7 @@
             
             mvPosition.xy += mvDirToCenter * phase * phase * powerProgress;
             
-            // 사건의 지평선 (블랙홀 중력 렌즈 왜곡)
+            // 사건의 지평선 (블랙홀 중력 왜곡 효과)
             float lensEffect = exp(-mvDist * 0.0005) * uDistortion * 2000.0;
             mvPosition.xy += mvDirNorm * lensEffect; 
             
@@ -101,6 +143,7 @@
         attribute vec3 aVelocity;
         attribute float aSize;
         varying float vBurstAlpha;
+
         void main() {
             vec3 finalPos = position + aVelocity * uBurstTime * 400.0 * uBurstPower;
             vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
@@ -120,55 +163,31 @@
     </script>
 
     <script>
-        // 모바일 최적화 계수
+        // 모바일 최적화 및 변수 선언부
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
         const Q_MULT = isMobile ? 0.33 : 1.0; 
 
-        // 오디오 에러(404)를 완벽히 무시하는 안전한 실행 함수
-        function safeAudioPlay(audio, volume = 1.0) {
-            if (audio) {
-                audio.volume = volume;
-                audio.currentTime = 0;
-                let promise = audio.play();
-                if (promise !== undefined) {
-                    promise.catch(e => { /* 오디오 파일이 없어도 에러 무시 */ });
-                }
-            }
-        }
-        function safeAudioPause(audio) {
-            if (audio) {
-                audio.pause();
-                audio.currentTime = 0;
-            }
-        }
-
-        let chargeAudio = new Audio('charge.mp3'); chargeAudio.loop = true;
-        let glitchAudio = new Audio('glitch.mp3'); glitchAudio.loop = true;
-
         let scene, camera, renderer, mouseGlow;
-        let bgParticlesMaterial, rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed;
+        let bgParticlesMaterial, bgParticles;
+        let rayEffectGlow, rayEffect, rayEffectOverlay, rayEffectCondensed;
         let fadeScene, fadeCamera, fadePlane; 
         
         let mouseX = 0, mouseY = 0;
         let isHolding = false;
         let lastHeldX = window.innerWidth / 2, lastHeldY = window.innerHeight / 2;
-        
-        let targetProgress = 0.0, currentProgress = 0.0; 
-        let explosionBrightness = 2.0; 
+        let targetProgress = 0.0, currentProgress = 0.0, explosionBrightness = 2.0; 
 
-        // 타이머 및 상태 변수
         let holdTime = 0.0, lastFrameTime = performance.now();
         let rotAngle1 = 0, rotAngle2 = 0;
         let uBlackoutValue = 0.0;
         
-        // 기폭(Implosion) 변수
         let isCollapsing = false;
         let collapseTime = 0.0;
-        const COLLAPSE_DURATION = 0.15; // 0.15초 응축 후 폭발
+        const COLLAPSE_DURATION = 0.15; 
         let releaseBurstIntensity = 0.0;
         let releaseScale = 0.0;
 
-        // 신규: 안으로 빨려 들어오는 역방향 파장
+        // 신규: 흡수 파장 풀 변수
         const revWaves = [];
         let revWaveTimer = 0.0;
         let revWaveIndex = 0;
@@ -182,7 +201,7 @@
         const BURST_PARTICLE_COUNT = Math.floor(80000 * Q_MULT); 
         const maxChargingMeteors = Math.floor(400 * Q_MULT);
         const maxCondenseMeteors = Math.floor(800 * Q_MULT); 
-        const maxBurstMeteors = Math.floor(2700 * Q_MULT); // 150% 증폭된 2700개 유성
+        const maxBurstMeteors = Math.floor(2700 * Q_MULT); // 150% 폭발 유성 개수
         const startChargingMeteors = Math.floor(50 * Q_MULT);
         const chargingMeteorRange = maxChargingMeteors - startChargingMeteors;
         const SPACE_RANGE = 10000;
@@ -190,7 +209,7 @@
         let currentBurstIndex = 0;
 
         init();
-        animate();
+        animate(); // 첫 실행 시 time 매개변수가 undefined 이지만 내부에서 안전하게 처리됨
 
         function createGlowTexture() {
             const canvas = document.createElement('canvas');
@@ -238,9 +257,11 @@
 
             bgParticlesMaterial = new THREE.ShaderMaterial({
                 uniforms: {
-                    uTime: { value: 0.0 }, uGatherProgress: { value: 0.0 },  
+                    uTime: { value: 0.0 }, 
+                    uGatherProgress: { value: 0.0 },  
                     uExplosionCenter: { value: new THREE.Vector2(0, 0) },
-                    uDistortion: { value: 0.0 }, uBlackout: { value: 0.0 }    
+                    uDistortion: { value: 0.0 }, 
+                    uBlackout: { value: 0.0 }    
                 },
                 vertexShader: document.getElementById('bgVertexShader').textContent,
                 fragmentShader: document.getElementById('bgFragmentShader').textContent,
@@ -249,7 +270,7 @@
             bgParticles = new THREE.Points(bgGeom, bgParticlesMaterial);
             scene.add(bgParticles);
 
-            // 유성우 셋업
+            // 기본 유성우
             const meteorGeometry = new THREE.CylinderGeometry(1, 0.1, 800, 3);
             meteorGeometry.rotateX(Math.PI / 2); 
             const meteorMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthTest: false });
@@ -267,7 +288,7 @@
                 m.userData.active = false; scene.add(m); chargingMeteors.push(m);
             }
 
-            // 흡수(응축) 파티클
+            // 블랙홀 흡수 파티클
             for(let i = 0; i < maxCondenseMeteors; i++) {
                 let isParticle = Math.random() > 0.5;
                 const cGeom = new THREE.CylinderGeometry(isParticle ? 4.0 : 1.2, isParticle ? 0.8 : 0.24, isParticle ? 50 : 2000, 3); 
@@ -277,7 +298,7 @@
                 m.userData.active = false; scene.add(m); condenseMeteors.push(m);
             }
 
-            // 다중 폭발 풀(Pool) 생성
+            // 폭발 풀(Pool) 생성
             for(let i = 0; i < MAX_BURSTS; i++) {
                 const burstDiv = document.createElement('div'); burstDiv.className = 'burst-effect'; document.body.appendChild(burstDiv);
                 const shockwaveDiv = document.createElement('div'); shockwaveDiv.className = 'shockwave-effect'; document.body.appendChild(shockwaveDiv);
@@ -322,12 +343,10 @@
                     scene.add(m); meteorsArr.push(m);
                 }
 
-                let burstAudio = new Audio('explosion.mp3');
-
                 burstPool.push({
                     active: false, time: 0.0,
                     burstDiv: burstDiv, shockwaveDiv: shockwaveDiv, fastShockwaveDiv: fastShockwaveDiv, flashDiv: flashDiv, 
-                    particlesMat: particlesMat, particlesMesh: particlesMesh, meteorMat: burstMeteorMat, meteors: meteorsArr, audio: burstAudio
+                    particlesMat: particlesMat, particlesMesh: particlesMesh, meteorMat: burstMeteorMat, meteors: meteorsArr
                 });
             }
 
@@ -336,13 +355,13 @@
             mouseGlow = new THREE.Sprite(glowMat);
             mouseGlow.scale.set(150, 150, 1); scene.add(mouseGlow);
 
-            // 잔상 이펙트를 위한 보조 씬
+            // 잔상 이펙트용 보조 씬 (렌더링 잘림 방지용 깊이 Z값 할당)
             fadeScene = new THREE.Scene();
-            fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+            fadeCamera.position.z = 1;
             fadePlane = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false }));
             fadeScene.add(fadePlane);
 
-            // 렌더러 설정 (잔상 유지를 위해 autoClearColor 끔)
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.autoClearColor = false; 
             renderer.setClearColor(0x000000, 1);
@@ -359,7 +378,6 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        // --- 재설정 및 보조 함수들 ---
         function resetMeteor(meteor) {
             meteor.position.set((Math.random() - 0.5) * 6000, (Math.random() - 0.5) * 4000, -2000 - Math.random() * 4000);
             meteor.userData.velocity = new THREE.Vector3((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 2.4 - 0.4, 8 + Math.random() * 8);
@@ -393,7 +411,6 @@
             bgParticlesMaterial.uniforms.uExplosionCenter.value.set(mouseX, mouseY);
         }
 
-        // --- 마우스 및 터치 이벤트 제어 ---
         function onMouseMove(event) { 
             if(isHolding) { lastHeldX = event.clientX; lastHeldY = event.clientY; }
             updateExplosionCenter(event.clientX, event.clientY); 
@@ -407,20 +424,17 @@
         }
 
         function triggerHoldStart(clientX, clientY) {
-            if (isCollapsing) return; // 붕괴 중 중복 클릭 방지
+            if (isCollapsing) return; 
             isHolding = true; targetProgress = 1.0; holdTime = 0.0; 
             lastHeldX = clientX; lastHeldY = clientY;
             updateExplosionCenter(clientX, clientY);
-            safeAudioPlay(chargeAudio, 1.0);
         }
 
         function triggerHoldEnd() {
             if (isHolding) { 
                 isHolding = false; 
-                safeAudioPause(chargeAudio); safeAudioPause(glitchAudio);
-                
                 if(currentProgress > 0.05) { 
-                    // 기폭(Implosion) 단계 진입: 강도 및 스케일 캡처
+                    // 기폭 단계 진입
                     let condenseProgressRaw = holdTime > 6.0 ? Math.min(1.0, (holdTime - 6.0) / 3.0) : 0.0;
                     let smoothCondense = condenseProgressRaw * condenseProgressRaw * (3 - 2 * condenseProgressRaw);
                     
@@ -434,7 +448,7 @@
             }
         }
 
-        // --- 폭발 실행 (150% 증폭 및 효과 복구) ---
+        // --- 폭발 실행 (150% 증폭) ---
         function executeBurst(intensity) {
             uBlackoutValue = 0.0; 
             let vInt = intensity * 1.5; // 150% 타격감 증폭
@@ -443,14 +457,12 @@
             currentBurstIndex = (currentBurstIndex + 1) % MAX_BURSTS; 
 
             b.active = true; b.time = 0.0;
-            safeAudioPlay(b.audio, Math.min(1.0, Math.max(0.1, vInt / 2.5)));
 
             b.particlesMesh.visible = true;
             b.particlesMat.uniforms.uBurstCenter.value.set(mouseX, mouseY);
             b.particlesMat.uniforms.uBurstPower.value = Math.max(0.2, vInt); 
             b.meteorMat.opacity = 1.0; 
 
-            // 요소 리플로우(Reflow) 강제 헬퍼
             const reflow = (el) => void el.offsetWidth;
 
             // 플래시뱅
@@ -491,7 +503,7 @@
             }, 150);
 
             const m3d = getMouse3DTarget();
-            const activeMeteorCount = Math.min(b.meteors.length, Math.floor(maxBurstMeteors * vInt)); // 1.5배 증가된 개수 연동
+            const activeMeteorCount = Math.min(b.meteors.length, Math.floor(maxBurstMeteors * vInt)); 
 
             b.meteors.forEach((meteor, index) => {
                 if (index < activeMeteorCount) {
@@ -520,6 +532,7 @@
 
         // --- 메인 렌더링 루프 ---
         function animate(time) {
+            time = time || performance.now(); // 시간 예외 처리 추가 (안전 장치)
             requestAnimationFrame(animate);
 
             let dt = (time - lastFrameTime) / 1000.0;
@@ -536,7 +549,7 @@
             let smoothCondense = condenseProgressRaw * condenseProgressRaw * (3 - 2 * condenseProgressRaw);
             let scaleMultiplier = 1.0 - (0.6 * smoothCondense);
 
-            // 신규: 안으로 모이는 공기 파장 (Reverse Shockwave) 효과
+            // 신규: 6초 이후 안으로 모이는 공기 파장 효과 (Reverse Shockwave)
             if (isHolding && holdTime > 6.0) {
                 revWaveTimer += dt;
                 if (revWaveTimer > 0.5) { // 0.5초마다 파장 방출
